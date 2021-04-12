@@ -11,7 +11,8 @@ import math # save_params에서 acc에 floor사용
 
 class DeepConvNet:
     
-    def __init__(self, layers_info = [
+    def __init__(self, 
+        layers_info = [
             'conv', 'Relu',
             'conv', 'Relu',
             'conv', 'Relu',
@@ -28,7 +29,8 @@ class DeepConvNet:
 
         self.weight_decay_lambda = weight_decay_lambda
         self.mini_batch_size = mini_batch_size
-        self.params_file_name = None
+
+        self.params_file_name = params_pkl_file
         self.learning_num = 0
 
         # 각 층의 뉴런 하나당 앞층의 뉴런과 연결된 노드 수 저장
@@ -178,7 +180,8 @@ class DeepConvNet:
         # print(self.layers)
 
         if params_pkl_file != None:
-            self.load_params(params_pkl_file)
+            if self.load_params(params_pkl_file) == False:
+                return
 
     def predict(self, x, train_flg=False):
         for layer in self.layers:
@@ -272,32 +275,33 @@ class DeepConvNet:
 
         return grads
 
-    def save_params(self, trainer, save_inside_dir=True, pkl_dir="saved_network_pkls"):
+    def save_params(self, trainer, save_inside_dir=True, pkl_dir="saved_pkls/network"):
         
         if len(trainer.test_accs) == 0:
-            acc = self.params_file_name.split("_")[-2].lstrip("acc_") # " " -> "_" 같이 수정해주어야 함
+            acc = self.params_file_name.split("_")[-2].lstrip("acc=") # " " -> "_" 같이 수정해주어야 함
         else:
             acc = math.floor(train_acc*10000)/100
         file_name = f"{trainer.optimizer.__class__.__name__}_lr={trainer.optimizer.lr}_ln={self.learning_num}_acc={acc}_params.pkl"
+        file_path = file_name
         
         optimizer = file_name.split("_")[0] ### if save_inside_dir: 안에 있으면 선언되지 않을 수 있음
         if save_inside_dir:
-            file_name = f"{pkl_dir}/{optimizer}/" + file_name
+            file_path = f"{pkl_dir}/{optimizer}/" + file_path
 
         if not os.path.exists(f"{pkl_dir}/{optimizer}"):
             os.makedirs(f"{pkl_dir}/{optimizer}")
-            print(f"Error: .{pkl_dir}/{optimizer} 폴더가 없어서 생성")
+            print(f"Error: {pkl_dir}/{optimizer} 폴더가 없어서 생성")
 
         # main process
         params = {}
         for key, val in self.params.items():
             params[key] = val
-        with open(file_name, 'wb') as f:
+        with open(file_path, 'wb') as f:
             pickle.dump(params, f)
 
-        print(f"\n네트워크 저장 성공! ({file_name})")
+        print(f"\n네트워크 저장 성공!\n({file_name})")
 
-    def load_params(self, file_name="params.pkl", pkl_dir="saved_network_pkls"):
+    def load_params(self, file_name="params.pkl", pkl_dir="saved_pkls/network"):
 
         if (".pkl" not in file_name) or (file_name[-4:] != ".pkl"):
             file_name = f"{file_name}.pkl"
@@ -306,20 +310,20 @@ class DeepConvNet:
         optimizer = file_path.split("_")[0] # " " -> "_" 같이 수정해주어야 함
         file_path = f"{optimizer}/{file_path}"
 
-        if (file_path.split("/")[0] != f"{pkl_dir}"):
+        if (file_path.split("/")[:-1] != f"{pkl_dir}"):
             file_path = f"{pkl_dir}/{file_path}"
 
         if not os.path.exists(f"{pkl_dir}/{optimizer}"):
             os.makedirs(f"{pkl_dir}/{optimizer}")
-            print(f"Error: {file_path} 파일이 없음, {pkl_dir}/{optimizer} 폴더가 없어서 생성")
+            print(f"Error: {pkl_dir}/{optimizer} 폴더가 없어서 생성")
 
         if not os.path.exists(file_path):
             file_path = file_name
             if not os.path.exists(file_path):
                 file_path = f"{pkl_dir}/{file_name}"
                 if not os.path.exists(file_path):
-                    print(f"Error: {file_path} 파일이 없음")
-                    return
+                    print(f"Error: {file_name} 파일이 없음")
+                    return False
 
         # main process
         with open(file_path, 'rb') as f:
@@ -331,7 +335,7 @@ class DeepConvNet:
             self.layers[layer_idx].W = self.params['W' + str(i+1)]
             self.layers[layer_idx].b = self.params['b' + str(i+1)]
 
-        print(f"\n학습된 네트워크 불러오기 성공! ({file_name})")
+        print(f"\n학습된 네트워크 불러오기 성공!\n({file_name})")
         self.params_file_name = file_name
 
         name_splited = file_path.split("_")
@@ -347,6 +351,8 @@ class DeepConvNet:
                 self.learning_num += int(ln)
             except:
                 print("Error: 누적 학습 횟수 가져오기 실패 (.pkl 파일 이름에서 누적 학습 정보(ln_)가 정수형이 아님")
+        
+        return True
 
     def think_win_xy(self, board):
         score_board = self.predict(board.reshape(1, 1, 15, 15))
@@ -363,5 +369,5 @@ class DeepConvNet:
         print("\n=== AI's Answer ===")
         print_board(board, winning_chance.round(0), mode="QnA_AI")
         print(f"구한 좌표: [{x}, {y}] ({winning_chance[y, x].round(1)}%)")
-
+        print(winning_chance.shape)
         return x, y

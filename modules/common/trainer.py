@@ -120,29 +120,30 @@ class Trainer:
             print("test acc:" + str(round(test_acc*100, 2)))
 
 
-    def save_graph_datas(self, network, save_inside_dir=True, pkl_dir="saved_graph_pkls"):
+    def save_graph_datas(self, network, save_inside_dir=True, pkl_dir="saved_pkls/graph"):
         
         if len(self.test_accs) == 0:
-            acc = network.params_file_name.split("_")[-2].lstrip("acc_")
+            acc = network.params_file_name.split("_")[-2].lstrip("acc=")
         else:
             acc = math.floor(train_acc*10000)/100
         file_name = f"{self.optimizer.__class__.__name__}_lr={self.optimizer.lr}_ln={network.learning_num}_acc={acc}_graphdata.pkl"
-            
+        file_path = file_name
+
+        optimizer = file_name.split("_")[0]
         if save_inside_dir:
-            optimizer = file_name.split("_")[0]
-            file_name = f"{pkl_dir}/{optimizer}/" + file_name
+            file_path = f"{pkl_dir}/{optimizer}/" + file_path
     
         if not os.path.exists(f"{pkl_dir}/{optimizer}"):
             os.makedirs(f"{pkl_dir}/{optimizer}")
-            print(f"Error: .{pkl_dir}/{optimizer} 폴더가 없어서 생성")
+            print(f"Error: {pkl_dir}/{optimizer} 폴더가 없어서 생성")
     
-        with open(file_name, 'wb') as f:
+        with open(file_path, 'wb') as f:
             pickle.dump(self.graph_datas, f)
     
-        print(f"\n그래프 데이터 저장 성공! ({file_name})")
+        print(f"\n그래프 데이터 저장 성공!\n({file_name})")
 
 
-def load_graph_datas(file_name="graphdata.pkl", pkl_dir="saved_graph_pkls"): ### class 밖에선 self 지워야 함
+def load_graph_datas(file_name="graphdata.pkl", pkl_dir="saved_pkls/graph"): ### class 밖에선 self 지워야 함
 
     if (".pkl" not in file_name) or (file_name[-4:] != ".pkl"):
         file_name = f"{file_name}.pkl"
@@ -151,24 +152,25 @@ def load_graph_datas(file_name="graphdata.pkl", pkl_dir="saved_graph_pkls"): ###
     optimizer = file_path.split("_")[0]
     file_path = f"{optimizer}/{file_path}"
 
-    if (file_path.split("/")[0] != f"{pkl_dir}"):
+    if (file_path.split("/")[:-1] != f"{pkl_dir}"):
         file_path = f"{pkl_dir}/{file_path}"
 
     if not os.path.exists(f"{pkl_dir}/{optimizer}"):
         os.makedirs(f"{pkl_dir}/{optimizer}")
-        print(f"Error: {file_path} 파일이 없음, {pkl_dir}/{optimizer} 폴더가 없어서 생성")
+        print(f"Error: {pkl_dir}/{optimizer} 폴더가 없어서 생성")
 
     if not os.path.exists(file_path):
         file_path = file_name
         if not os.path.exists(file_path):
             file_path = f"{pkl_dir}/{file_name}"
             if not os.path.exists(file_path):
-                print(f"Error: {file_path} 파일이 없음")
+                print(f"Error: {file_name} 파일이 없음")
                 return
 
     # main process
     with open(file_path, 'rb') as f:
         graph_datas = pickle.load(f)
+        
+    print(f"\n그래프 데이터 불러오기 성공!\n({file_name})")
     return graph_datas
     
-    print(f"\n그래프 데이터 불러오기 성공! ({file_name})")

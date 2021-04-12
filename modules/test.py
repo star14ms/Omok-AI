@@ -1,6 +1,8 @@
 import numpy as np
 from modules.common.functions import softmax, cross_entropy_error
 
+import random
+
 def first_place_yx(array2dim, find_all=False):
     if not find_all: # return y, x
         return array2dim.argmax()//15, array2dim.argmax()%15
@@ -81,14 +83,14 @@ def print_board(*args, mode="QnA_AI", num_answers=1):
     if mode == "QnA_AI":
         print("\n🟤 < 0.5% < 🔴 < 5% < 🟠 < 20% < 🟡 < 50% < 🟢 < 80% < 🔵 < 95% < 🟣\n")
 
-def test(network, x_data, t_data, index):
+def test_pick(network, x_data, t_data, index):
     x = x_data[index:index+1]
     t = t_data[index:index+1].reshape(15, 15)
 
     score_board = network.predict(x)
-    a_y, a_x = score_board_reshape.argmax()//15, score_board_reshape.argmax()%15
+    a_y, a_x = score_board.argmax()//15, score_board.argmax()%15
 
-    winning_chance = (softmax(score_board) * 100).reshape(15, 15) ### score_board_reshape.round(2) np.round_(winning_chance, 2)
+    winning_chance = (softmax(score_board) * 100).reshape(15, 15) ### x.round(2) np.round_(x, 2)
     # winning_chance = np.where(winning_chance==winning_chance[a_y, a_x], winning_chance, 0)
     
     t_yxs = first_place_yx(t, find_all=True)
@@ -99,7 +101,7 @@ def test(network, x_data, t_data, index):
         winning_chances.append(chance)
 
     print("\n=== 점수(scores) ===")
-    print(score_board_reshape.astype(np.int64).reshape(15, 15))
+    print(score_board.astype(np.int64).reshape(15, 15))
     print("\n=== 각 자리의 확률 분배(%) ===")
     print(winning_chance.astype(np.int64))
     print(f"\n=== Question_{index} ===")
@@ -112,3 +114,17 @@ def test(network, x_data, t_data, index):
         print(f"{t_yx} ({t_yx_chance}%)", end=" / ")
     print(f"\n구한 좌표: [{a_y}, {a_x}] ({winning_chance[a_y, a_x].round(1)}%)", end=" / ")
     print("정답!" if [a_y, a_x] in t_yxs else "응 아니야~")
+
+# 랜덤 테스트
+class test:
+
+    def random_pick(network, x_datas, t_datas, scope_l=0, scope_r=None):
+        
+        if scope_r == None:
+            scope_r = t_datas.shape[0]
+
+        while True:
+            test_pick(network, x_datas, t_datas, random.randrange(scope_l, scope_r))
+            answer = input("\n테스트를 계속할까? 예(any)/아니오(n)")
+            if answer == "n":
+                break

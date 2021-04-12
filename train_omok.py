@@ -10,8 +10,7 @@ from matplotlib import pyplot
 import datetime as dt
 from selenium import webdriver
 # 무작위 데이터 골라 테스트
-from modules.test import first_place_yx, print_board, test
-import random
+from modules.test import print_board, test
 import time
 
 # 학습할 데이터 만들기
@@ -32,43 +31,42 @@ params_pkl_file = "Momentum_lr=0.01_ln=21450_acc=100.0_params"
 network = DeepConvNet(params_pkl_file=params_pkl_file, mini_batch_size=mini_batch_size)
 
 # # 학습
-# trainer = Trainer(epochs=5, optimizer=optimizer, optimizer_param={'lr':lr}, verbose=True, 
-#     mini_batch_size=mini_batch_size, give_up={'epoch': 11},
-#     network=network, x_train=x_train, t_train=t_train, x_test=x_test, t_test=t_test)
+trainer = Trainer(epochs=5, optimizer=optimizer, optimizer_param={'lr':lr}, verbose=True, 
+    mini_batch_size=mini_batch_size, give_up={'epoch': 11},
+    network=network, x_train=x_train, t_train=t_train, x_test=x_test, t_test=t_test)
 # trainer.train()
 
-# # # 학습된 신경망, 그래프 데이터 저장
-# network.save_params(trainer)
+# # 학습된 신경망, 그래프 데이터 저장
+# is_1 = input("\n학습한 네트워크를 저장할거니? 예(any)/아니오(f) : ")
+# if is_1 != "f":
+#     network.save_params(trainer)
+# else:
+#     print("저장 안했다^^")
+
 # trainer.save_graph_datas(network)
 
 # 그래프 출력
 graph_datas = load_graph_datas("Momentum_lr=0.01_ln=21450_acc=100.0_graphdata.pkl")
-plot_loss_graph(graph_datas["train_losses"], smooth=False, ylim=2)
-plot_accuracy_graph(graph_datas["train_accs"], graph_datas["test_accs"])
+# plot_loss_graph(graph_datas["train_losses"], smooth=False, ylim=2)
+# plot_accuracy_graph(graph_datas["train_accs"], graph_datas["test_accs"])
 
-# 틀린 문제 확인
-accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True) # , multiple_answers=True
-Fnum, Qnum = len(wrong_idxs), len(t_datas)
-print(f"\n총 {Qnum} 문제 중, 정답 {Qnum-Fnum}개, 오답 {Fnum}개 (정답률: {math.floor(accuracy*10000)/100}%)")
+# # 틀린 문제 확인
+# accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True) # , multiple_answers=True
+# Fnum, Qnum = len(wrong_idxs), len(t_datas)
+# print(f"\n총 {Qnum} 문제 중, 정답 {Qnum-Fnum}개, 오답 {Fnum}개 (정답률: {math.floor(accuracy*10000)/100}%)")
 
-input("\n틀린 문제들을 확인하려면 enter키를 눌러")
-for idx in wrong_idxs:
-    test(network, x_datas, t_datas, idx)
-    answer = input()
-    if answer == "1":
-        break
+# input("\n틀린 문제들을 확인하려면 enter키를 눌러")
+# for idx in wrong_idxs:
+    # test(network, x_datas, t_datas, idx)
+    # answer = input()
+    # if answer == "1":
+    #     break
 
-# 테스트
-input("테스트를 시작하려면 enter키를 눌러")
+# 테스트 
+input("\n테스트를 시작하려면 enter키를 눌러")
 # np.set_printoptions(precision=2, suppress=True)
 
-# 랜덤 테스트
-while True: # 4to5 (0, 825), (825, 1650), (1650, 2255), (2255, 2860)
-    test(network, x_datas, t_datas, random.randrange(0, 2860))
-    answer = input()
-    if answer == "1":
-        break
-
+test.random_pick(network, x_datas, t_datas) # 4to5 (0, 825), (825, 1650), (1650, 2255), (2255, 2860)
 
 # # 각 pkl별 정확도 비교
 # for i in range(4):

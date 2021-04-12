@@ -457,7 +457,7 @@ while not exit:
                         screen.blit(win_white,(0,250))
 
                     # 기보 파일로 저장
-                    with open('GiBo.txt', 'a', encoding='utf8') as file:
+                    with open('etc/GiBo.txt', 'a', encoding='utf8') as file:
                         file.write(datetime.today().strftime("%Y/%m/%d %H:%M:%S") + "\n") # YYYY/mm/dd HH:MM:SS 형태로 출력
                         for i in range(len(record)):
                             turn_hangul = "흑" if record[i][2] == 1 else "백"
