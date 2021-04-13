@@ -44,7 +44,7 @@ if train_network:
 # 학습된 신경망, 그래프 데이터 저장
 # if train_network:
 a = input("\n네트워크를 저장할거니? 예(any)/아니오(f) : ")
-if a != "f":
+if a != "f" and a != "ㄹ":
     network.save_params(trainer)
 else:
     print("저장 안했다^^")

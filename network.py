@@ -44,7 +44,7 @@ class DeepConvNet:
         self.layers = [] # 레이어 생성
         self.params = {} # 레이어의 가중치와 편향들 저장
         self.layer_idxs_used_params = [] # 가중치와 편향을 사용하는 레이어들의 위치
-        self.loaded_params = {}
+        self.loaded_params = {} ### 저장해놨다가 네트워크 생성 후 다시 self.params에 업데이트 
 
         # pkl 파일을 입력받았다면 불러오기
         if saved_network_pkl != None:
@@ -54,9 +54,14 @@ class DeepConvNet:
 
         layers_info = [layer.lower() for layer in self.layers_info]
         layers_info[-1] = "softmaxloss"
+        layers_info[-2] = "relu"
+        layers_info[-4] = "relu"
+        layers_info[-6] = "relu"
+        layers_info[-8] = "relu"
         layers_info[-3] = "convsum"
         self.saved_network_pkl = "Momentum_lr=0.01_ln=28600_acc=99.93_params"
-        # print(layers_info)
+        self.layers_info = layers_info
+        print(layers_info)
         # 각 층의 뉴런 사이에 연결된 노드 수 저장
         node_nums = np.array([0 for i in range(len(params_))])
         conv_params = []
@@ -202,10 +207,10 @@ class DeepConvNet:
         # print(self.layers)
 
         if saved_network_pkl != None:
-            # print(self.layer_idxs_used_params)
+            self.params = self.loaded_params ### 네트워크를 self.params에 옮기지 않았음 
             for i, layer_idx in enumerate(self.layer_idxs_used_params): ### layers, layer_idxs_used_params 먼저 로드해야 함
-                self.layers[layer_idx].W = self.loaded_params['W' + str(i+1)]
-                self.layers[layer_idx].b = self.loaded_params['b' + str(i+1)]
+                self.layers[layer_idx].W = self.params['W' + str(i+1)]
+                self.layers[layer_idx].b = self.params['b' + str(i+1)]
 
     def predict(self, x, train_flg=False):
         for layer in self.layers:
@@ -338,16 +343,17 @@ class DeepConvNet:
         file_name = f"{trainer.optimizer.__class__.__name__}_lr={trainer.optimizer.lr}_ln={self.learning_num}_acc={acc}_params.pkl"
         file_path = file_name
         
-        # network_name = ""
-        # for layer in self.layers_info:
-        #     if layer == "conv":
-        #         network_name = network_name + "C"
-        #     elif layer == "convsum"
-        #         network_name = network_name + "Csum"
-        #     elif layer == "relu"
-        #         network_name = network_name + "R_"
-        #     elif layer == "softmaxloss"
-        #         network_name = network_name + "Sm"
+        network_name = ""
+        for layer in self.layers_info:
+            if layer == "conv":
+                network_name = network_name + "C"
+            elif layer == "convsum":
+                network_name = network_name + "Csum"
+            elif layer == "relu":
+                network_name = network_name + "R_"
+            elif layer == "softmaxloss":
+                network_name = network_name + "Sm"
+        print(network_name)
         
         optimizer = file_name.split("_")[0] ### if save_inside_dir: 안에 있으면 선언되지 않을 수 있음
         if save_inside_dir:
@@ -358,10 +364,10 @@ class DeepConvNet:
             print(f"Error: {pkl_dir}/{optimizer} 폴더 생성")
 
         # main process
-        params = {}
-        for key, val in self.params.items():
-            params[key] = val
-        self.network_infos["params"] = params
+        # params = {}
+        # for key, val in self.params.items():
+        #     params[key] = val
+        # self.network_infos["params"] = params
 
         with open(file_path, 'wb') as f:
             pickle.dump(self.network_infos, f)
@@ -403,7 +409,7 @@ class DeepConvNet:
         self.weight_decay_lambda = network_infos["weight_decay_lambda"]    
         self.saved_network_pkl   = network_infos["saved_network_pkl"] 
         self.learning_num        = network_infos["learning_num"]
-        print(network_infos["layers_info"], network_infos["params_"], network_infos["learning_num"], network_infos["saved_network_pkl"] )
+        print(network_infos["layers_info"], network_infos["learning_num"], network_infos["saved_network_pkl"] )
         self.loaded_params = network_infos["params"]
         # self.layers = network_infos["layers"] # pkl파일 용량이 너무 커짐
         # self.layer_idxs_used_params = network_infos["layer_idxs_used_params"] ### 새로운 레이어들이 또 append됨
