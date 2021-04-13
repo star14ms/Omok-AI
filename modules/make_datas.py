@@ -109,6 +109,27 @@ class make_datas:
 
         return x_datas, t_datas # , t2_datas
 
+    def last_one(one_hot_label=True, score=1, blank_score=0):
+        x_datas = np.full([225*4, 225], score, dtype=int) # 900개
+        t_datas = np.full([225*4], score, dtype=int)
+        
+        N = 0
+        for blank_idx in range(225):
+            for _ in range(4):
+                white_mask = np.random.choice(225, 112)
+                x_datas[N, white_mask] = -score # 두번째 차원 1 -> 0
+                x_datas[N, blank_idx] = 0
+                t_datas[N] = blank_idx
+                N += 1
+
+        x_datas = x_datas.reshape(225*4, 1, 15, 15)
+
+        if one_hot_label:
+            t_datas = _change_one_hot_label(t_datas)
+
+        return x_datas, t_datas
+
+
 class split_datas:
 
     def even_odd(xb_datas, t_datas):
@@ -136,4 +157,22 @@ def _change_some_hot_labels(X):
 
     return T
     
-    
+
+# # 학습할 문제들 보기
+# import random
+# from test import print_board
+
+# x_train, t_train = make_datas.last_one()
+# print(x_train.shape, t_train.shape)
+
+# idx = 0
+# while True: ### 훈련/검증 데이터로 반으로 쪼개짐 5720 /2
+
+#     idx += 1
+#     # idx = random.randrange(0, t_train.shape[0]) ### 범위 밖으로 나감
+#     # print_board(x_train[idx:idx+1], t_train[idx:idx+1], mode="QnA")
+#     print()
+#     print_board(x_train[idx:idx+1], mode="Q")
+#     answer = input("")
+#     if answer == "n":
+#         break

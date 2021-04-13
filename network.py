@@ -7,17 +7,17 @@ import numpy as np
 from collections import OrderedDict
 from common.layers import *
 from modules.test import print_board
-import math # save_params에서 acc에 floor사용
+import math # save_params에서 acc에 floor사용, accuracy에서 ceil 사용
 
 class DeepConvNet:
     
     def __init__(self, 
         layers_info = [
-            'conv',  'Relu',
-            'conv',  'Relu',
-            'conv',  'Relu',
-            'conv2d','Relu',
-            'softmax'
+            'conv',   'Relu',
+            'conv',   'Relu',
+            'conv',   'Relu',
+            'convSum','Relu',
+            'softmaxLoss'
         ], params_ = [(1, 15, 15),
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
@@ -27,6 +27,7 @@ class DeepConvNet:
         ], dropout_ration=0.5, pooling_params={"pool_h": 2, "pool_w": 2, "stride": 2}, 
            weight_decay_lambda=0, mini_batch_size=110, saved_network_pkl=None):
 
+        layers_info = [layer.lower() for layer in layers_info]
         self.network_infos = {}
 
         # __init__() 매개변수 (신경망 정보 출력용)
@@ -43,15 +44,19 @@ class DeepConvNet:
         self.layers = [] # 레이어 생성
         self.params = {} # 레이어의 가중치와 편향들 저장
         self.layer_idxs_used_params = [] # 가중치와 편향을 사용하는 레이어들의 위치
+        self.loaded_params = {}
 
         # pkl 파일을 입력받았다면 불러오기
         if saved_network_pkl != None:
             if self.load_params(saved_network_pkl) == False:
                 print("네트워크 불러오기 실패...")
                 return ImportError
-            else:
-                return
 
+        layers_info = [layer.lower() for layer in self.layers_info]
+        layers_info[-1] = "softmaxloss"
+        layers_info[-3] = "convsum"
+        self.saved_network_pkl = "Momentum_lr=0.01_ln=28600_acc=99.93_params"
+        # print(layers_info)
         # 각 층의 뉴런 사이에 연결된 노드 수 저장
         node_nums = np.array([0 for i in range(len(params_))])
         conv_params = []
@@ -85,7 +90,7 @@ class DeepConvNet:
                 idx += 1
                 
                 # 채널들을 합치는 합성곱 계층인지 여부를 저장 (다음 노드 수가 달라짐: /채널 수)
-                if 'end' in layer:
+                if 'sum' in layer:
                     conv_Sum_Cannels = True
                 else:
                     conv_Sum_Cannels = False
@@ -135,7 +140,6 @@ class DeepConvNet:
         # print(node_nums)
 
         # 가중치 초깃값 설정
-        layers_info = [layer.lower() for layer in layers_info]
         if 'relu' in layers_info:
             weight_init_scales = np.sqrt(2.0 / node_nums) # He 초깃값
         elif ('sigmoid' in layers_info) or ('tanh' in layers_info):
@@ -156,7 +160,7 @@ class DeepConvNet:
                 self.params['b' + str(idx+1)] = np.zeros(conv_params[idx]['filter_num'])
                 pre_channel_num = conv_params[idx]['filter_num']
 
-                if '2d' not in layer:
+                if 'sum' not in layer:
                     self.layers.append(Convolution(self.params['W' + str(idx+1)], self.params['b' + str(idx+1)], 
                     conv_params[idx]['stride'], conv_params[idx]['pad'], reshape_2dim=False))
                 else:
@@ -185,17 +189,23 @@ class DeepConvNet:
                 self.layers.append(Pooling(pool_h=pooling_params["pool_h"], pool_w=pooling_params["pool_w"], stride=pooling_params["stride"]))
             elif layer == 'dropout' or layer == 'drop':
                 self.layers.append(Dropout(dropout_ration))
-            elif 'softmax' in layers_info or 'soft' in layers_info:
+            elif 'softmaxloss' in layers_info or 'softloss' in layers_info:
                 self.last_layer = SoftmaxWithLoss()
             elif 'sigmoidloss' in layers_info or 'sigloss' in layers_info:
                 self.last_layer = SigmoidWithLoss()
             elif 'squaredloss' in layers_info or 'loss' in layers_info:
                 self.last_layer = SquaredLoss()
             else:
-                print(f"\nError: Undefined function.({layer})\n")
+                print(f"\nError: Undefined layer.({layer})\n")
                 return False
-
+        # print(layers_info)
         # print(self.layers)
+
+        if saved_network_pkl != None:
+            # print(self.layer_idxs_used_params)
+            for i, layer_idx in enumerate(self.layer_idxs_used_params): ### layers, layer_idxs_used_params 먼저 로드해야 함
+                self.layers[layer_idx].W = self.loaded_params['W' + str(i+1)]
+                self.layers[layer_idx].b = self.loaded_params['b' + str(i+1)]
 
     def predict(self, x, train_flg=False):
         for layer in self.layers:
@@ -216,11 +226,14 @@ class DeepConvNet:
 
         return self.last_layer.forward(y, t) + weight_decay
 
-    def accuracy(self, x, t, save_wrong_idxs=False, multiple_answers=False):
+    def accuracy(self, x, t, save_wrong_idxs=False, multiple_answers=False, verbose=False):
         batch_size = self.mini_batch_size
+        # if len(t) % batch_size != 0:
+        #     print(f"\n문제 수가 미니배치 수로 나누어 떨어지지 않음\n(뒤에 남는 {len(t) % batch_size}문제는 풀지 못함)")
+        if verbose:
+            print(f"\n=== 정답률 측정 (총 {x.shape[0]}문제) ===\n")
         if t.ndim != 1 : 
             t = np.argmax(t, axis=1)
-
         # if not multiple_answers:
             # if t.ndim != 1 : t = np.argmax(t, axis=1)
         # else:
@@ -237,11 +250,14 @@ class DeepConvNet:
             #     t_yxs1 = t_yxs[...][0]
 
         acc = 0.0
-        wrong_idxs = []
+        wrong_idxs = [] # 풀어보지 못한 나머지 문제들을 모두 맞았다고 처리
+        # right_idxs = [] # 풀어보지 못한 나머지 문제들을 모두 틀렸다고 처리
 
-        for i in range(int(x.shape[0] / batch_size)):
-            tx = x[i*batch_size:(i+1)*batch_size]
-            tt = t[i*batch_size:(i+1)*batch_size]
+        for i in range( math.ceil(x.shape[0] / batch_size) ):
+            tx = x[i*batch_size:(i+1)*batch_size if (i+1)*batch_size <= x.shape[0] else x.shape[0]]
+            tt = t[i*batch_size:(i+1)*batch_size if (i+1)*batch_size <= x.shape[0] else x.shape[0]]
+            if verbose:
+                print("문제", i*batch_size, "~", (i+1)*batch_size if (i+1)*batch_size <= x.shape[0] else x.shape[0], "푸는 중")
             y = self.predict(tx, train_flg=False)
             y = np.argmax(y, axis=1)
             acc += np.sum(y == tt)
@@ -257,8 +273,16 @@ class DeepConvNet:
             if save_wrong_idxs:
                 batch_idx = np.where(y != tt)
                 wrong_idxs = wrong_idxs + (i*batch_size+batch_idx[0]).tolist()
-
+                # ridxs = (i*batch_size+(np.where(y == tt))[0]).tolist()
+                # right_idxs = right_idxs + ridxs
+                # print(ridxs)
+        
         if save_wrong_idxs:
+            # print(len(right_idx, len(wrong_idxs)))
+            # print(right_idxs)
+            if verbose:
+                Fnum, Qnum = len(wrong_idxs), x.shape[0]
+                print(f"\n=== 총 {Qnum}문제, 정답 {Qnum-Fnum}개, 오답 {Fnum}개 (정답률: {math.floor(acc/x.shape[0]*100*100)/100}%) ===")
             return acc / x.shape[0], wrong_idxs
         else:
             return acc / x.shape[0]
@@ -301,9 +325,9 @@ class DeepConvNet:
         self.network_infos["learning_num"]        = self.learning_num
 
         self.network_infos["params"] = self.params
-        self.network_infos["layers"] = self.layers
-        self.network_infos["layer_idxs_used_params"] = self.layer_idxs_used_params
-
+        # self.network_infos["layers"] = self.layers # pkl파일 용량이 너무 커짐 (이미 layers_info가 있으니 똑같이 다신 만들 수 있음)
+        # self.network_infos["layer_idxs_used_params"] = self.layer_idxs_used_params  ### 새로운 레이어들이 또 append됨
+        print(self.saved_network_pkl)
         if len(trainer.test_accs) == 0:
             if self.saved_network_pkl == None:
                 acc = "None"
@@ -313,6 +337,17 @@ class DeepConvNet:
             acc = math.floor(trainer.test_accs[-1]*100*100)/100
         file_name = f"{trainer.optimizer.__class__.__name__}_lr={trainer.optimizer.lr}_ln={self.learning_num}_acc={acc}_params.pkl"
         file_path = file_name
+        
+        # network_name = ""
+        # for layer in self.layers_info:
+        #     if layer == "conv":
+        #         network_name = network_name + "C"
+        #     elif layer == "convsum"
+        #         network_name = network_name + "Csum"
+        #     elif layer == "relu"
+        #         network_name = network_name + "R_"
+        #     elif layer == "softmaxloss"
+        #         network_name = network_name + "Sm"
         
         optimizer = file_name.split("_")[0] ### if save_inside_dir: 안에 있으면 선언되지 않을 수 있음
         if save_inside_dir:
@@ -365,21 +400,25 @@ class DeepConvNet:
         self.params_             = network_infos["params_"] 
         self.dropout_ration      = network_infos["dropout_ration"] 
         self.pooling_params      = network_infos["pooling_params"] 
-        self.weight_decay_lambda = network_infos["weight_decay_lambda"] 
-        self.mini_batch_size     = network_infos["mini_batch_size"] 
+        self.weight_decay_lambda = network_infos["weight_decay_lambda"]    
         self.saved_network_pkl   = network_infos["saved_network_pkl"] 
         self.learning_num        = network_infos["learning_num"]
-        
-        self.params = network_infos["params"]
-        self.layers = network_infos["layers"]
-        self.layer_idxs_used_params = network_infos["layer_idxs_used_params"]
+        print(network_infos["layers_info"], network_infos["params_"], network_infos["learning_num"], network_infos["saved_network_pkl"] )
+        self.loaded_params = network_infos["params"]
+        # self.layers = network_infos["layers"] # pkl파일 용량이 너무 커짐
+        # self.layer_idxs_used_params = network_infos["layer_idxs_used_params"] ### 새로운 레이어들이 또 append됨
 
         # params = network_infos["params"]
         # for key, val in params.items():
         #     self.params[key] = val
-        for i, layer_idx in enumerate(self.layer_idxs_used_params): ### layers, layer_idxs_used_params 먼저 로드해야 함
-            self.layers[layer_idx].W = self.params['W' + str(i+1)]
-            self.layers[layer_idx].b = self.params['b' + str(i+1)]
+        
+        if self.mini_batch_size != network_infos["mini_batch_size"]:
+            print("\nError: '불러올 신경망의 미니배치 수'와 '처음 선언한 미니배치 수'가 일치하지 않는다", end=" ")
+            print("(앞으로 풀 문제의 수를 나누어 떨어지게 하는 것이 좋음)")
+            answer = input("\n어느 것을 선택하시겠습니까? 선언한 수(any)/불러온 수(1): ")
+            if answer == "1":
+                self.mini_batch_size = network_infos["mini_batch_size"] 
+            print("미니배치 수", self.mini_batch_size, "선택")
 
         print(f"\n네트워크 불러오기 성공!\n({file_name})")
         

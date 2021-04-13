@@ -4,6 +4,26 @@ from common.functions import *
 from common.util import im2col, col2im
 
 
+class MatMul:
+    def __init__(self, W):
+        self.params = [W]
+        self.grads = [np.zeros_like(W)]
+        self.x = None
+
+    def forward(self, x):
+        W, = self.params
+        out = np.dot(x, W)
+        self.x = x
+        return out
+
+    def backward(self, dout):
+        W, = self.params
+        dx = np.dot(dout, W.T)
+        dW = np.dot(self.x.T, dout)
+        self.grads[0][...] = dW
+        return dx
+
+
 class Relu:
     def __init__(self):
         self.mask = None
@@ -65,6 +85,22 @@ class Affine:
         self.db = np.sum(dout, axis=0)
 
         dx = dx.reshape(*self.original_x_shape)  # 入力データの形状に戻す（テンソル対応）
+        return dx
+
+
+class Softmax:
+    def __init__(self):
+        self.params, self.grads = [], []
+        self.out = None
+
+    def forward(self, x):
+        self.out = softmax(x)
+        return self.out
+
+    def backward(self, dout):
+        dx = self.out * dout
+        sumdx = np.sum(dx, axis=1, keepdims=True)
+        dx -= self.out * sumdx
         return dx
 
 
@@ -231,9 +267,10 @@ class Convolution:
         self.x = x
         self.col = col
         self.col_W = col_W
-        # print(out)
+        # print(out.shape)
         if self.reshape_2dim:
             out = np.sum(out, axis=1)
+            # print(out.shape)
             return out.reshape(N, -1)
         else:
             return out
@@ -337,3 +374,185 @@ class SquaredLoss:
     def backward(self, dout=1):
         dx = self.y - self.t
         return dx
+
+# ================================================================ Embedding
+
+class Embedding:
+    def __init__(self, W):
+        self.params = [W]
+        self.grads = [np.zeros_like(W)]
+        self.idx = None
+
+    def forward(self, idx):
+        W, = self.params
+        self.idx = idx
+        out = W[idx]
+        return out
+
+    def backward(self, dout):
+        dW, = self.grads
+        dW[...] = 0
+        if GPU:
+            np.scatter_add(dW, self.idx, dout)
+        else:
+            np.add.at(dW, self.idx, dout)
+        return None
+
+
+class EmbeddingDot:
+    def __init__(self, W):
+        self.embed = Embedding(W)
+        self.params = self.embed.params
+        self.grads = self.embed.grads
+        self.cache = None
+
+    def forward(self, h, idx):
+        target_W = self.embed.forward(idx)
+        out = np.sum(target_W * h, axis=1)
+
+        self.cache = (h, target_W)
+        return out
+
+    def backward(self, dout):
+        h, target_W = self.cache
+        dout = dout.reshape(dout.shape[0], 1)
+
+        dtarget_W = dout * h
+        self.embed.backward(dtarget_W)
+        dh = dout * target_W
+        return dh
+
+
+class UnigramSampler: # 한 단어를 대상으로 확률분포를 만듬 (Unigram: 하나의 (연속된) 단어)
+    def __init__(self, corpus, power, sample_size):
+        self.sample_size = sample_size
+        self.vocab_size = None
+        self.word_p = None
+
+        counts = collections.Counter()
+        for word_id in corpus:
+            counts[word_id] += 1
+
+        vocab_size = len(counts)
+        self.vocab_size = vocab_size
+
+        self.word_p = np.zeros(vocab_size)
+        for i in range(vocab_size):
+            self.word_p[i] = counts[i]
+
+        self.word_p = np.power(self.word_p, power)
+        self.word_p /= np.sum(self.word_p)
+
+    def get_negative_sample(self, target):
+        batch_size = target.shape[0]
+
+        if not GPU:
+            negative_sample = np.zeros((batch_size, self.sample_size), dtype=np.int32)
+
+            for i in range(batch_size):
+                p = self.word_p.copy()
+                target_idx = target[i]
+                p[target_idx] = 0
+                p /= p.sum()
+                negative_sample[i, :] = np.random.choice(self.vocab_size, size=self.sample_size, replace=False, p=p)
+        else:
+            # GPU(cupy）で計算するときは、速度を優先
+            # 負例にターゲットが含まれるケースがある
+            negative_sample = np.random.choice(self.vocab_size, size=(batch_size, self.sample_size),
+                                               replace=True, p=self.word_p)
+
+        return negative_sample
+
+
+class NegativeSamplingLoss:
+    def __init__(self, W, corpus, power=0.75, sample_size=5):
+        self.sample_size = sample_size
+        self.sampler = UnigramSampler(corpus, power, sample_size)
+        self.loss_layers = [SigmoidWithLoss() for _ in range(sample_size + 1)]
+        self.embed_dot_layers = [EmbeddingDot(W) for _ in range(sample_size + 1)]
+
+        self.params, self.grads = [], []
+        for layer in self.embed_dot_layers:
+            self.params += layer.params
+            self.grads += layer.grads
+
+    def forward(self, h, target):
+        batch_size = target.shape[0]
+        negative_sample = self.sampler.get_negative_sample(target)
+
+        # 正例のフォワード
+        score = self.embed_dot_layers[0].forward(h, target)
+        correct_label = np.ones(batch_size, dtype=np.int32)
+        loss = self.loss_layers[0].forward(score, correct_label)
+
+        # 負例のフォワード
+        negative_label = np.zeros(batch_size, dtype=np.int32)
+        for i in range(self.sample_size):
+            negative_target = negative_sample[:, i]
+            score = self.embed_dot_layers[1 + i].forward(h, negative_target)
+            loss += self.loss_layers[1 + i].forward(score, negative_label)
+
+        return loss
+
+    def backward(self, dout=1):
+        dh = 0
+        for l0, l1 in zip(self.loss_layers, self.embed_dot_layers):
+            dscore = l0.backward(dout)
+            dh += l1.backward(dscore)
+
+        return dh
+
+
+class NotZeroSamplingLoss: ## num0를 푸는 문제마다 달라지게 할 수 있을까?
+    def __init__(self, W, num0):
+        self.num0 = num0
+        self.loss_layers = [SigmoidWithLoss() for _ in range(self.num0 + 1)]
+        self.embed_dot_layers = [EmbeddingDot(W) for _ in range(self.num0 + 1)]
+
+        self.params, self.grads = [], []
+        for layer in self.embed_dot_layers:
+            self.params += layer.params
+            self.grads += layer.grads
+         
+    def get_not0_samples(self, x_board):
+        batch_size = x_board.shape[0]
+        if x_board.ndim == 4:
+            x_board = x_board.reshape(-1, 225) # .transpose(1, 0)
+
+        not0_idxs = np.zeros([batch_size, self.num0], dtype=int)
+        not0_idxs_untidy = np.argwhere(x_board != 0)
+
+        for i in range(batch_size):
+            not0_idxs[i, :] = not0_idxs_untidy[self.num0*i : self.num0*i+self.num0, 1] # not0_idxs[:][1] X
+        # print(not0_idxs)
+        # print("="*32)
+        return not0_idxs
+
+    def forward(self, scores, x_board):
+        batch_size = x_board.shape[0]
+        negative_sample = self.get_not0_samples(x_board)
+
+        # 정례의 forward
+        score = self.embed_dot_layers[0].forward(scores, scores.argmax(axis=1))
+        correct_label = np.ones(batch_size, dtype=np.int32)
+        loss = self.loss_layers[0].forward(score, correct_label)
+        print(scores.argmax(axis=1)) # scores.astype(np.int32).reshape(2, 15, 15), 
+
+        # 부례의 forward
+        negative_label = np.zeros(batch_size, dtype=np.int32)
+        for i in range(self.num0):
+            negative_target = negative_sample[:, i]
+            score = self.embed_dot_layers[1 + i].forward(scores, negative_target)
+            loss += self.loss_layers[1 + i].forward(score, negative_label)
+            print(negative_target) # scores.astype(np.int32).reshape(2, 15, 15), 
+
+        return loss
+
+    def backward(self, dout=1):
+        dh = 0
+        for l0, l1 in zip(self.loss_layers, self.embed_dot_layers):
+            dscore = l0.backward(dout)
+            dh += l1.backward(dscore)
+
+        return dh
+    
