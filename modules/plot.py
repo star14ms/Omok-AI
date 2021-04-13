@@ -1,18 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from common.util import smooth_curve
-# %matplotlib inline
+import math
+# %matplotlib inline 이게 뭐고, 어떻게 사용하는거지???
 
-def plot_loss_graph(train_loss, smooth=True, ylim=2.5):
-    x = np.arange(len(train_loss))
+def plot_loss_graph(train_losses, smooth=True):
+    x = np.arange(len(train_losses))
 
     if smooth:
-        plt.plot(x, smooth_curve(train_loss), f"-", label="loss")
+        plt.plot(x, smooth_curve(train_losses), f"-", label="loss")
     else:
-        plt.plot(x, train_loss, f"-", label="loss")
+        plt.plot(x, train_losses, f"-", label="loss")
 
     plt.xlabel("iterations")
     plt.ylabel("loss")
+    ylim = math.ceil(train_losses[0]*10)/10
     plt.ylim(0, ylim)
     plt.legend(loc='upper right')
     plt.show()
@@ -42,10 +44,10 @@ def plot_accuracy_graphs(train_accs, test_accs, str_optims, colors=('b', 'g', 'r
     plt.legend(loc='lower right') # 그래프 이름 표시
 
 
-def plot_loss_graphs(train_loss, str_optims, smooth=True, colors=('b', 'g', 'r', 'c', 'm', 'y', 'k', 'w'), ylim=2.5):
-    x = np.arange(len(train_loss[str_optims[0]]))
+def plot_loss_graphs(train_losses, str_optims, smooth=True, colors=('b', 'g', 'r', 'c', 'm', 'y', 'k', 'w'), ylim=2.5):
+    x = np.arange(len(train_losses[str_optims[0]]))
     for str_optim, color in zip(str_optims, colors):
-        y = smooth_curve(train_loss[str_optim]) if smooth else train_loss[str_optim]
+        y = smooth_curve(train_losses[str_optim]) if smooth else train_losses[str_optim]
         plt.plot(x, y, label=str_optim) # f"-{color}"
     plt.xlabel("iterations")
     plt.ylabel("loss")

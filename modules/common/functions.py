@@ -47,7 +47,7 @@ def cross_entropy_error(y, t):
     # 教師データがone-hot-vectorの場合、正解ラベルのインデックスに変換
     if t.size == y.size:
         t = t.argmax(axis=1)
-    # t = 1 
+    # t = 1 ### 임의로 정답 라벨을 수정해버려서 손실 함수가 높게 나옴
              
     batch_size = y.shape[0]
     # print(batch_size , t)

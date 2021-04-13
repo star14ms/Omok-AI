@@ -10,7 +10,7 @@ class Trainer:
     """ニューラルネットの訓練を行うクラス
     """
     def __init__(self, network, x_train, t_train, x_test, t_test,
-                 epochs=20, mini_batch_size=100, give_up={'epoch':None},
+                 epochs=20, mini_batch_size=100, give_up={'epoch':-1},
                  optimizer='SGD', optimizer_param={'lr':0.01},
                  evaluate_sample_num_per_epoch=None, verbose=True, verbose_epoch=True):
         self.network = network
@@ -67,7 +67,7 @@ class Trainer:
             train_loss_append(loss)
             # test_loss = self.network.loss(self.x_test, self.t_test)
             # test_loss_append(test_loss)
-            if self.verbose: print(f"{i+1}/{self.max_iter} - train loss:" + str(round(loss), 4))
+            if self.verbose: print(f"{i+1}/{self.max_iter} - loss: " + str( round(loss, 4) ))
             
             if self.current_iter % self.iter_per_epoch == 0:
                 self.current_epoch += 1
@@ -86,12 +86,12 @@ class Trainer:
 
                 if self.verbose_epoch: 
                     print("=== epoch:" + str(self.current_epoch) + ", train acc:" + str(
-                        math.floor(train_acc*10000)/100) + "%, test acc:" + str(
-                        math.floor(test_acc*10000)/100) + "% ===")
+                        math.floor(train_acc*100*100)/100) + "%, test acc:" + str(
+                        math.floor(test_acc*100*100)/100) + "% ===")
                     # print("=== " + str(self.current_epoch) + " / train:" + format(loss, ".10f") + ", test:" + format(test_loss, ".10f") + " (loss) ===")
                     # print("=== epoch: " + str(self.current_epoch) + "train_loss: " + str(round(loss, 3)) + " ===")
                 
-                if self.current_epoch == self.give_up['epoch'] and self.give_up != {}:
+                if self.current_epoch == self.give_up['epoch']:
                     if 'test_loss' in self.give_up and (np.isnan(loss) or loss > self.give_up['test_loss']):
                         if self.verbose: print(f"I give up! (loss:{self.loss})")
                         self.isgiveup = True
@@ -116,8 +116,8 @@ class Trainer:
         
         if self.verbose_epoch:
             print("=============== Final Test Accuracy ===============")
-            print("train acc:" + str(round(train_acc*100, 2)), end=", ")
-            print("test acc:" + str(round(test_acc*100, 2)))
+            print("train acc: " + str(round(train_acc*100, 2)) + "%", end=", ")
+            print("test acc: " + str(round(test_acc*100, 2)) + "%")
 
 
     def save_graph_datas(self, network, save_inside_dir=True, pkl_dir="saved_pkls/graph"):
@@ -125,7 +125,7 @@ class Trainer:
         if len(self.test_accs) == 0:
             acc = network.params_file_name.split("_")[-2].lstrip("acc=")
         else:
-            acc = math.floor(train_acc*10000)/100
+            acc = math.floor(self.test_accs[-1]*100*100)/100
         file_name = f"{self.optimizer.__class__.__name__}_lr={self.optimizer.lr}_ln={network.learning_num}_acc={acc}_graphdata.pkl"
         file_path = file_name
 
@@ -135,7 +135,7 @@ class Trainer:
     
         if not os.path.exists(f"{pkl_dir}/{optimizer}"):
             os.makedirs(f"{pkl_dir}/{optimizer}")
-            print(f"Error: {pkl_dir}/{optimizer} 폴더가 없어서 생성")
+            print(f"Error: {pkl_dir}/{optimizer} 폴더 생성")
     
         with open(file_path, 'wb') as f:
             pickle.dump(self.graph_datas, f)

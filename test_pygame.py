@@ -10,7 +10,7 @@ from pygame_src.foul_detection import isFive, num_Four, num_Three
 # AI Deep Learning network
 from network import DeepConvNet
 
-network = DeepConvNet(params_pkl_file="Momentum_lr=0.01_ln=21450_acc=100.0_params")
+network = DeepConvNet(saved_network_pkl="Momentum_lr=0.01_ln=28600_acc=99.93_params")
 
 ################################################################ pygame code
 
