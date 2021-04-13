@@ -123,19 +123,18 @@ class Trainer:
     def save_graph_datas(self, network, save_inside_dir=True, pkl_dir="saved_pkls/graph"):
         
         if len(self.test_accs) == 0:
-            acc = network.params_file_name.split("_")[-2].lstrip("acc=")
+            acc = network.saved_network_pkl.split(" ")[-2].lstrip("acc=")
         else:
             acc = math.floor(self.test_accs[-1]*100*100)/100
-        file_name = f"{self.optimizer.__class__.__name__}_lr={self.optimizer.lr}_ln={network.learning_num}_acc={acc}_graphdata.pkl"
+        file_name = f"{network.network_name} {self.optimizer.__class__.__name__} lr={self.optimizer.lr} ln={network.learning_num} acc={acc} graphdata.pkl"
         file_path = file_name
 
-        optimizer = file_name.split("_")[0]
         if save_inside_dir:
-            file_path = f"{pkl_dir}/{optimizer}/" + file_path
+            file_path = f"{pkl_dir}/{network.network_name}/" + file_path
     
-        if not os.path.exists(f"{pkl_dir}/{optimizer}"):
-            os.makedirs(f"{pkl_dir}/{optimizer}")
-            print(f"Error: {pkl_dir}/{optimizer} 폴더 생성")
+        if not os.path.exists(f"{pkl_dir}/{network.network_name}"):
+            os.makedirs(f"{pkl_dir}/{network.network_name}")
+            print(f"{pkl_dir}/{network.network_name} 폴더 생성")
     
         with open(file_path, 'wb') as f:
             pickle.dump(self.graph_datas, f)
@@ -149,15 +148,15 @@ def load_graph_datas(file_name="graphdata.pkl", pkl_dir="saved_pkls/graph"): ###
         file_name = f"{file_name}.pkl"
     file_path = file_name
 
-    optimizer = file_path.split("_")[0]
-    file_path = f"{optimizer}/{file_path}"
+    network_name = file_path.split(" ")[0]
+    file_path = f"{network_name}/{file_path}"
 
     if (file_path.split("/")[:-1] != f"{pkl_dir}"):
         file_path = f"{pkl_dir}/{file_path}"
 
-    if not os.path.exists(f"{pkl_dir}/{optimizer}"):
-        os.makedirs(f"{pkl_dir}/{optimizer}")
-        print(f"Error: {pkl_dir}/{optimizer} 폴더가 없어서 생성")
+    if not os.path.exists(f"{pkl_dir}/{network_name}"):
+        os.makedirs(f"{pkl_dir}/{network_name}")
+        print(f"Error: {pkl_dir}/{network_name} 폴더가 없어서 생성")
 
     if not os.path.exists(file_path):
         file_path = file_name

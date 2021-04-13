@@ -51,17 +51,23 @@ class DeepConvNet:
             if self.load_params(saved_network_pkl) == False:
                 print("네트워크 불러오기 실패...")
                 return ImportError
+            # else:
+                # self.saved_network_pkl = "CR_CR_CR_CsumR_Smloss Momentum lr=0.01 ln=28600 acc=99.93 params"
+                # self.layers_info = [layer.lower() for layer in self.layers_info]
+                # layers_info = self.layers_info
 
-        layers_info = [layer.lower() for layer in self.layers_info]
-        layers_info[-1] = "softmaxloss"
-        layers_info[-2] = "relu"
-        layers_info[-4] = "relu"
-        layers_info[-6] = "relu"
-        layers_info[-8] = "relu"
-        layers_info[-3] = "convsum"
-        self.saved_network_pkl = "Momentum_lr=0.01_ln=28600_acc=99.93_params"
-        self.layers_info = layers_info
-        print(layers_info)
+        self.network_name = ""
+        for layer in self.layers_info:
+            if layer == "conv":
+                self.network_name = self.network_name + "C"
+            elif layer == "convsum":
+                self.network_name = self.network_name + "Csum"
+            elif layer == "relu":
+                self.network_name = self.network_name + "R_"
+            elif layer == "softmaxloss":
+                self.network_name = self.network_name + "Smloss"
+        # print(self.network_name)
+
         # 각 층의 뉴런 사이에 연결된 노드 수 저장
         node_nums = np.array([0 for i in range(len(params_))])
         conv_params = []
@@ -332,36 +338,24 @@ class DeepConvNet:
         self.network_infos["params"] = self.params
         # self.network_infos["layers"] = self.layers # pkl파일 용량이 너무 커짐 (이미 layers_info가 있으니 똑같이 다신 만들 수 있음)
         # self.network_infos["layer_idxs_used_params"] = self.layer_idxs_used_params  ### 새로운 레이어들이 또 append됨
-        print(self.saved_network_pkl)
+        # print(self.saved_network_pkl)
         if len(trainer.test_accs) == 0:
             if self.saved_network_pkl == None:
                 acc = "None"
             else: ### self. 빼먹음
-                acc = self.saved_network_pkl.split("_")[-2].lstrip("acc=") # " " -> "_" 같이 수정해주어야 함
+                acc = self.saved_network_pkl.split(" ")[-2].lstrip("acc=") # " " -> "_" 같이 수정해주어야 함
         else:
             acc = math.floor(trainer.test_accs[-1]*100*100)/100
-        file_name = f"{trainer.optimizer.__class__.__name__}_lr={trainer.optimizer.lr}_ln={self.learning_num}_acc={acc}_params.pkl"
+        
+        file_name = f"{self.network_name} {trainer.optimizer.__class__.__name__} lr={trainer.optimizer.lr} ln={self.learning_num} acc={acc} params.pkl"
         file_path = file_name
         
-        network_name = ""
-        for layer in self.layers_info:
-            if layer == "conv":
-                network_name = network_name + "C"
-            elif layer == "convsum":
-                network_name = network_name + "Csum"
-            elif layer == "relu":
-                network_name = network_name + "R_"
-            elif layer == "softmaxloss":
-                network_name = network_name + "Sm"
-        print(network_name)
-        
-        optimizer = file_name.split("_")[0] ### if save_inside_dir: 안에 있으면 선언되지 않을 수 있음
-        if save_inside_dir:
-            file_path = f"{pkl_dir}/{optimizer}/" + file_path
+        if save_inside_dir: ### if save_inside_dir: 안에 선언이 있으면 선언되지 않을 수 있음
+            file_path = f"{pkl_dir}/{self.network_name}/" + file_path
 
-        if not os.path.exists(f"{pkl_dir}/{optimizer}"):
-            os.makedirs(f"{pkl_dir}/{optimizer}")
-            print(f"Error: {pkl_dir}/{optimizer} 폴더 생성")
+        if not os.path.exists(f"{pkl_dir}/{self.network_name}"):
+            os.makedirs(f"{pkl_dir}/{self.network_name}")
+            print(f"{pkl_dir}/{self.network_name} 폴더 생성")
 
         # main process
         # params = {}
@@ -380,15 +374,15 @@ class DeepConvNet:
             file_name = f"{file_name}.pkl"
         file_path = file_name
 
-        optimizer = file_path.split("_")[0] # " " -> "_" 같이 수정해주어야 함
-        file_path = f"{optimizer}/{file_path}"
+        netwrok_name = file_path.split(" ")[0] # " " -> "_" 같이 수정해주어야 함
+        file_path = f"{netwrok_name}/{file_path}"
 
         if (file_path.split("/")[:-1] != f"{pkl_dir}"):
             file_path = f"{pkl_dir}/{file_path}"
 
-        if not os.path.exists(f"{pkl_dir}/{optimizer}"):
-            os.makedirs(f"{pkl_dir}/{optimizer}")
-            print(f"Error: {pkl_dir}/{optimizer} 폴더가 없어서 생성")
+        if not os.path.exists(f"{pkl_dir}/{netwrok_name}"):
+            os.makedirs(f"{pkl_dir}/{netwrok_name}")
+            print(f"Error: {pkl_dir}/{netwrok_name} 폴더가 없어서 생성")
 
         if not os.path.exists(file_path):
             file_path = file_name
@@ -409,10 +403,12 @@ class DeepConvNet:
         self.weight_decay_lambda = network_infos["weight_decay_lambda"]    
         self.saved_network_pkl   = network_infos["saved_network_pkl"] 
         self.learning_num        = network_infos["learning_num"]
-        print(network_infos["layers_info"], network_infos["learning_num"], network_infos["saved_network_pkl"] )
+
         self.loaded_params = network_infos["params"]
         # self.layers = network_infos["layers"] # pkl파일 용량이 너무 커짐
         # self.layer_idxs_used_params = network_infos["layer_idxs_used_params"] ### 새로운 레이어들이 또 append됨
+        
+        # print(network_infos["layers_info"], network_infos["learning_num"], network_infos["saved_network_pkl"] )
 
         # params = network_infos["params"]
         # for key, val in params.items():

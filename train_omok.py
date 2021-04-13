@@ -25,10 +25,10 @@ saved_network_pkl = None
 saved_graphdata_pkl = None
 
 # ================================ < 주석을 풀면 학습 실행
-# train_network = True 
+train_network = True 
 # ================================ v 주석을 풀면 신경망 불러오기
-saved_network_pkl = "Momentum_lr=0.01_ln=28600_acc=99.93_params"
-# saved_graphdata_pkl = "Momentum_lr=0.01_ln=28600_acc=99.93_graphdata"
+# saved_network_pkl = "CR_CR_CR_CsumR_Smloss Momentum lr=0.01 ln=28600 acc=99.93 params"
+# saved_graphdata_pkl = "CR_CR_CR_CsumR_Smloss Momentum lr=0.01 ln=28600 acc=99.93 graphdata"
 # ================================ ^ 주석을 풀면 지난 학습정보 그래프 데이터 불러오기 (그래프 출력용)
 
 # 신경망 생성
@@ -43,30 +43,30 @@ if train_network:
 
 # 학습된 신경망, 그래프 데이터 저장
 # if train_network:
-a = input("\n네트워크를 저장할거니? 예(any)/아니오(f) : ")
-if a != "f" and a != "ㄹ":
-    network.save_params(trainer)
-else:
-    print("저장 안했다^^")
+# a = input("\n네트워크를 저장할거니? 예(any)/아니오(f) : ")
+# if a != "f" and a != "ㄹ":
+#     network.save_params(trainer)
+# else:
+#     print("저장 안했다^^")
     
-    # a = input("\n학습 정보를 저장할거니? (그래프 출력용) 예(any)/아니오(f) : ")
-    # if a != "f":
-    #     trainer.save_graph_datas(network)
-    # else:
-    #     print("저장 안했다^^")
+# a = input("\n학습 정보를 저장할거니? (그래프 출력용) 예(any)/아니오(f) : ")
+# if a != "f":
+#     trainer.save_graph_datas(network)
+# else:
+#     print("저장 안했다^^")
 
 # 그래프 출력
+if train_network:
+    plot_loss_graph(trainer.train_losses, smooth=False)
+    plot_accuracy_graph(trainer.train_accs, trainer.test_accs)
 if saved_graphdata_pkl != None:
     graph_datas = load_graph_datas(saved_graphdata_pkl)
     plot_loss_graph(graph_datas["train_losses"], smooth=False)
     plot_accuracy_graph(graph_datas["train_accs"], graph_datas["test_accs"])
-if train_network:
-    plot_loss_graph(trainer.train_losses, smooth=False)
-    plot_accuracy_graph(trainer.train_accs, trainer.test_accs)
 
 # 정확도 구하고 맞거나 틀린 문제 확인
-accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True, verbose=True) # , multiple_answers=True
-test_right_or_wrong_answers(network, x_datas, t_datas, wrong_idxs)
+# accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True, verbose=True) # , multiple_answers=True
+# test_right_or_wrong_answers(network, x_datas, t_datas, wrong_idxs)
 
 # 테스트
 test_random_picks(network, x_datas, t_datas) # 4to5 (0, 825), (825, 1650), (1650, 2255), (2255, 2860)
