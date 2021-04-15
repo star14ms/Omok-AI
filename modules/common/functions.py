@@ -50,7 +50,7 @@ def cross_entropy_error(y, t):
     # t = 1 ### 임의로 정답 라벨을 수정해버려서 손실 함수가 높게 나옴
              
     batch_size = y.shape[0]
-    print(type(t), t.shape)
+    # print(type(t), t.shape)
     # print(np.arange(batch_size), t)
     return -np.sum(np.log(y[np.arange(batch_size), t] + 1e-7)) / batch_size
 

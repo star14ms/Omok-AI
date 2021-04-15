@@ -1,6 +1,6 @@
 # coding: utf-8
 import numpy as np
-
+import sys
 
 def smooth_curve(x):
     """損失関数のグラフを滑らかにするために用いる
@@ -97,3 +97,71 @@ def col2im(col, input_shape, filter_h, filter_w, stride=1, pad=0):
             img[:, :, y:y_max:stride, x:x_max:stride] += col[:, :, y, x, :, :]
 
     return img[:, :, pad:H + pad, pad:W + pad]
+
+import time
+def print_time(start_time): 
+    time_delta = int(time.time() - start_time)
+    h, m, s = (time_delta // 3600), (time_delta//60 - time_delta//3600*60), (time_delta % 60)
+    print(f"\n{h}h {m}m {s}s")
+
+import datetime as dt
+from selenium import webdriver
+def Alerm(webdriver_path=r'C:\Users\danal\Documents\programing\chromedriver.exe', loading_sec=7):
+    now = dt.datetime.today()
+
+    if int(now.strftime('%S')) < 60 - loading_sec:
+        alarm_time = now + dt.timedelta(minutes=1)
+    else:
+        alarm_time = now + dt.timedelta(minutes=2)
+
+    alarm_time = alarm_time.strftime('%X')
+    driver = webdriver.Chrome(webdriver_path)
+    driver.get(f'https://vclock.kr/#time={alarm_time}&title=%EC%95%8C%EB%9E%8C&sound=musicbox&loop=1')
+    driver.find_element_by_xpath('//*[@id="pnl-main"]').click()
+    input()
+
+
+class bcolors:
+    
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    ORANGE = '\u001b[38;5;208m'
+
+    c = [HEADER, OKBLUE, OKCYAN, OKGREEN, WARNING, FAIL, ENDC, BOLD, UNDERLINE, ORANGE]
+
+    def test():
+        for color in bcolors.c:
+            print(color + "Warning: No active frommets remain. Continue?" + bcolors.ENDC)
+
+    def according_to(x):
+        if 0.5 <= x < 5:
+            return bcolors.FAIL
+        elif 5 <= x < 20:
+            return bcolors.ORANGE
+        elif 20 <= x < 50:
+            return bcolors.WARNING
+        elif 50 <= x < 80:
+            return bcolors.OKGREEN
+        elif 80 <= x < 95:
+            return bcolors.OKBLUE
+        elif 95 <= x < 99:
+            return bcolors.HEADER
+        elif 99 <= x:
+            return bcolors.BOLD
+        else:
+            return bcolors.ENDC
+
+    def ANSI_codes():
+        for i in range(0, 16):
+            for j in range(0, 16):
+                code = str(i * 16 + j)
+                sys.stdout.write(u"\u001b[38;5;" + code + "m" + code.ljust(4))
+            print(u"\u001b[0m")
+

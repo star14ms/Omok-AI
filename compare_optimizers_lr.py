@@ -3,89 +3,99 @@ from network import DeepConvNet
 from modules.common.trainer import Trainer
 import datetime as dt
 import time
-# 알람 울리기
-import datetime as dt
-from selenium import webdriver
+import numpy as np
+from modules.common.util import print_time, Alerm
+from modules.plot import plot
+import pickle
 
-start = time.time()
+start_time = time.time()
 
 # 학습할 데이터 만들기
-x_datas, t_datas, t_datas_real = make_datas._4to5(score=1, blank_score=0)
+x_datas, t_datas = make_datas._4to5(score=1, blank_score=0)
 x_train, t_train, x_test, t_test = split_datas.even_odd(x_datas, t_datas)
 
 # 학습 정보 출력 함수 정의
-def print_learning_info(acc_list, attempts_number):
+def print_learning_info(optimizer, lr, last_val_accs, isgiveup):
     
-    if not trainer.isgiveup:
-        accuracy = round(sum(acc_list)/attempts_number, 2)
-        accuracy_info = str(" \ acc: " + str(accuracy) + "%")
+    average_accuracy = sum(last_val_accs)/len(last_val_accs)
+    if not isgiveup:
+        accuracy_info = str("acc: {}%".format( round(average_accuracy, 2) ))
     else:
-        accuracy_info = str(" \ acc: None")
+        accuracy_info = str("acc: None")
 
-    if exponent <= 0:
-        lr = format(10**exponent, f".{-exponent}f")
-    else:
-        lr = 10**exponent
-
-    learning_info = str(optimizer+" \ "+"lr: "+str(lr)+accuracy_info)
+    standard_deviation = sum((np.array(last_val_accs)-average_accuracy) ** 2) / len(last_val_accs) ** 1/2
+    
+    if lr < 0.001:
+        lr = np.format_float_scientific(lr)
+    
+    learning_info = str(f"{optimizer} | lr: {lr} | {accuracy_info} (표준편차: {standard_deviation}")
     print(learning_info, end=" ")
     
-    if trainer.isgiveup:
+    if isgiveup:
         print(f"-- I gave up")
-    elif accuracy > 80:
+    elif average_accuracy > 80:
         print("-- good!! 💚")
     else:
         print()
 
 # 매개변수 생성
-exponents = {       # 0, -7, -1
-    'SGD':      range(-1, -2, -1),
-    'Momentum': range(-2, -3, -1), 
-    'Adagrad':  range(-2, -3, -1), 
-    'Adam':     range(-2, -3, -1), 
-    'Nesterov': range(-2, -3, -1), 
-    'Rmsprop':  range(-3, -4, -1),
+exponents = {
+    'SGD':      range(-2, -3, -1),
+    # 'Momentum': range(0, -14, -1),
+    # 'Adagrad':  range(0, -14, -1),
+    # 'Adam':     range(0, -14, -1),
+    # 'Nesterov': range(0, -14, -1),
+    # 'Rmsprop':  range(0, -14, -1),
 }
-attempts_number = 5
-epochs = 10
+attempts_number = 3
+epochs = 1
 
 give_up = {'epoch': 3} # 'test_acc':0.1
 mini_batch_size = 110
-
+results_train = {}
+results_val = {}
 print(f"\nattempts:{attempts_number}, epochs:{epochs}")
 
 # 매개변수 최적화 방법과 학습률에 따른 딥러닝 효율 비교
 for optimizer in exponents:
-    print("\noptimizer: " + str(optimizer))
+    print("\noptimizer: " + optimizer)
+    
     for exponent in exponents[optimizer]:
-        acc_list = []
+        lr = 10 ** exponent
+        attempts = 0
+        last_val_accs = []
+
         for _ in range(attempts_number):
+            attempts += 1
             network = DeepConvNet(mini_batch_size=mini_batch_size)
             
-            trainer = Trainer(epochs=epochs, optimizer=optimizer, optimizer_param={'lr':10 ** exponent}, verbose=False, 
+            trainer = Trainer(epochs=epochs, optimizer=optimizer, optimizer_param={'lr':lr}, verbose=False, 
                 mini_batch_size=mini_batch_size, give_up=give_up, verbose_epoch=False,
                 network=network, x_train=x_train, t_train=t_train, x_test=x_test, t_test=t_test)
             trainer.train()
 
-            if trainer.isgiveup:
-                break
-            acc = trainer.test_acc_list[-1]*100
-            acc_list.append(acc)
+            if trainer.isgiveup: break
 
-        print_learning_info(acc_list, attempts_number)
+            key = f"{optimizer}_{attempts} | lr: {lr} "
+            results_train[key] = trainer.train_accs ### *100 하면 100번 복사됨
+            results_val[key] = trainer.test_accs
+            last_val_accs.append(trainer.test_accs[-1])
+            
+        print_learning_info(optimizer, lr, last_val_accs, isgiveup=trainer.isgiveup)
 
+# 학습 끝나면 소요 시간 출력하고 알람 울리기
+print_time(start_time)
+# Alerm()
 
-time_delta = int(time.time() - start)
-h, m, s = (time_delta // 3600), (time_delta//60 - time_delta//3600*60), (time_delta % 60)
-print(f"\n{h}h {m}m {s}s")
+pkl_file = "Hyper_Parameter_Optimization.pkl"
+results = {"results_train": results_train, "results_val": results_val}
 
-# 학습 끝나면 알람 울리기
-now = dt.datetime.today()
-if int(now.strftime('%S')) < 52:
-    alarm_time = now + dt.timedelta(minutes=1)
-else:
-    alarm_time = now + dt.timedelta(minutes=2)
-alarm_time = alarm_time.strftime('%X')
-driver = webdriver.Chrome(r'C:\Users\danal\Documents\programing\chromedriver.exe')
-driver.get(f'https://vclock.kr/#time={alarm_time}&title=%EC%95%8C%EB%9E%8C&sound=musicbox&loop=1')
-driver.find_element_by_xpath('//*[@id="pnl-main"]').click()
+with open(pkl_file, 'wb') as f:
+    pickle.dump(results, f)
+
+print("=========== Hyper-Parameter Optimization Result ===========")
+plot.many_accuracy_graphs(results_train, results_val, graph_draw_num=20, col_num=5, sort=False)
+
+with open(pkl_file, 'rb') as f:
+    r = pickle.load(f)
+plot.many_accuracy_graphs(r["results_train"], r["results_val"], graph_draw_num=20, col_num=5, sort=False)

@@ -86,12 +86,12 @@ class Trainer:
 
                 if self.verbose_epoch: 
                     print("=== epoch:" + str(self.current_epoch) + ", train acc:" + str(
-                        math.floor(train_acc*100*100)/100) + "%, test acc:" + str(
-                        math.floor(test_acc*100*100)/100) + "% ===")
+                        math.floor(train_acc*100)/100) + "%, test acc:" + str(
+                        math.floor(test_acc*100)/100) + "% ===")
                     # print("=== " + str(self.current_epoch) + " / train:" + format(loss, ".10f") + ", test:" + format(test_loss, ".10f") + " (loss) ===")
                     # print("=== epoch: " + str(self.current_epoch) + "train_loss: " + str(round(loss, 3)) + " ===")
                 
-                if self.current_epoch == self.give_up['epoch']:
+                if self.give_up['epoch'] == self.current_epoch:
                     if 'test_loss' in self.give_up and (np.isnan(loss) or loss > self.give_up['test_loss']):
                         if self.verbose: print(f"I give up! (loss:{self.loss})")
                         self.isgiveup = True
@@ -116,8 +116,8 @@ class Trainer:
         
         if self.verbose_epoch:
             print("=============== Final Test Accuracy ===============")
-            print("train acc: " + str(round(train_acc*100, 2)) + "%", end=", ")
-            print("test acc: " + str(round(test_acc*100, 2)) + "%")
+            print("train acc: " + str(round(train_acc, 2)) + "%", end=", ")
+            print("test acc: " + str(round(test_acc, 2)) + "%")
 
 
     def save_graph_datas(self, network, save_inside_dir=True, pkl_dir="saved_pkls/graph"):
@@ -125,7 +125,7 @@ class Trainer:
         if len(self.test_accs) == 0:
             acc = network.saved_network_pkl.split(" ")[-2].lstrip("acc=")
         else:
-            acc = math.floor(self.test_accs[-1]*100*100)/100
+            acc = math.floor(self.test_accs[-1]*100)/100
         file_name = f"{network.network_name} {self.optimizer.__class__.__name__} lr={self.optimizer.lr} ln={network.learning_num} acc={acc} graphdata.pkl"
         file_path = file_name
 

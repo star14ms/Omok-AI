@@ -1,7 +1,7 @@
 # coding: utf-8
 import sys, os
 sys.path.append(os.pardir)  # 親ディレクトリのファイルをインポートするための設定
-sys.path.append('modules')  # 親ディレクトリのファイルをインポートするための設定
+sys.path.append('modules')
 import pickle
 import numpy as np
 from collections import OrderedDict
@@ -17,7 +17,7 @@ class DeepConvNet:
             'conv',   'Relu',
             'conv',   'Relu',
             'convSum','Relu',
-            'softmaxLoss'
+            'Not0SamplingLoss'
         ], params_ = [(1, 15, 15),
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
@@ -25,11 +25,12 @@ class DeepConvNet:
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
 
         ], dropout_ration=0.5, pooling_params={"pool_h": 2, "pool_w": 2, "stride": 2}, 
-           weight_decay_lambda=0, mini_batch_size=110, saved_network_pkl=None):
+           weight_decay_lambda=0, mini_batch_size=110, saved_network_pkl=None, not0_size=4):
 
         layers_info = [layer.lower() for layer in layers_info]
-        self.network_infos = {}
-
+        # print(layers_info)
+        self.network_infos = {} # pkl파일에 저장할 네트워크 정보
+        
         # __init__() 매개변수 (신경망 정보 출력용)
         self.layers_info = layers_info
         self.params_ = params_
@@ -38,13 +39,16 @@ class DeepConvNet:
         self.weight_decay_lambda = weight_decay_lambda
         self.mini_batch_size = mini_batch_size
         self.saved_network_pkl = saved_network_pkl
-
+        
         # class에서 사용하는 매개변수
         self.learning_num = 0 # 문제를 학습한 횟수
-        self.layers = [] # 레이어 생성
         self.params = {} # 레이어의 가중치와 편향들 저장
-        self.layer_idxs_used_params = [] # 가중치와 편향을 사용하는 레이어들의 위치
+        
         self.loaded_params = {} ### 저장해놨다가 네트워크 생성 후 다시 self.params에 업데이트 
+        self.layer_idxs_used_params = [] # 가중치와 편향을 사용하는 레이어들의 위치
+        self.layers = [] # 레이어 저장
+        
+        self.not0_size = not0_size # 오답 샘플 개수
 
         # pkl 파일을 입력받았다면 불러오기
         if saved_network_pkl != None:
@@ -56,6 +60,7 @@ class DeepConvNet:
                 # self.layers_info = [layer.lower() for layer in self.layers_info]
                 # layers_info = self.layers_info
 
+        # 네트워크 정보 문자로 나타내기 (네트워크를 저장할 때 파일 이름으로 쓰임)
         self.network_name = ""
         for layer in self.layers_info:
             if layer == "conv":
@@ -64,8 +69,10 @@ class DeepConvNet:
                 self.network_name = self.network_name + "Csum"
             elif layer == "relu":
                 self.network_name = self.network_name + "R_"
-            elif layer == "softmaxloss":
+            elif layer == "smloss":
                 self.network_name = self.network_name + "Smloss"
+            elif layer == "not0samplingloss":
+                self.network_name = self.network_name + "N0sloss"
         # print(self.network_name)
 
         # 각 층의 뉴런 사이에 연결된 노드 수 저장
@@ -156,11 +163,11 @@ class DeepConvNet:
         elif ('sigmoid' in layers_info) or ('tanh' in layers_info):
             weight_init_scales = np.sqrt(1.0 / node_nums) # Xavier 초깃값
         else:
-            print("\nError: There is no activation function. (relu or sigmoid or tanh)\n")
             weight_init_scales = 0.01
-    
+            print("\nError: There is no activation function. (relu or sigmoid or tanh)\n")
+
         pre_channel_num = params_[0][0] if type(params_[0]) == tuple else params_[0] ### params_[0][1]
-        
+
         idx = 0
         for layer_idx, layer in enumerate(layers_info):
 
@@ -204,10 +211,12 @@ class DeepConvNet:
                 self.last_layer = SoftmaxWithLoss()
             elif 'sigmoidloss' in layers_info or 'sigloss' in layers_info:
                 self.last_layer = SigmoidWithLoss()
-            elif 'squaredloss' in layers_info or 'loss' in layers_info:
+            elif 'squaredloss' in layers_info:
                 self.last_layer = SquaredLoss()
+            elif 'not0samplingloss' in layers_info:
+                self.last_layer = Not0SamplingLoss(not0_num=self.not0_size) ## 5로도 시험, num0를 푸는 문제마다 달라지게 할 수 있을까?
             else:
-                print(f"\nError: Undefined layer.({layer})\n")
+                print(f"\nError: Undefined layer ({layer})\n")
                 return False
         # print(layers_info)
         # print(self.layers)
@@ -229,15 +238,20 @@ class DeepConvNet:
 
     def loss(self, x, t):
         y = self.predict(x, train_flg=True)
-
+        # print(x.shape)
         weight_decay = 0
         for i, _ in enumerate(self.layer_idxs_used_params):
             W = self.params['W' + str(i+1)]
             weight_decay += 0.5 * self.weight_decay_lambda * np.sum(W**2)
+        # print(self.last_layer, type(self.last_layer), self.last_layer.__class__.__name__)
+        if type(self.last_layer) == Not0SamplingLoss:
+            loss = self.last_layer.forward(y, t, x) ### Not0SamplingLoss는 문제 데이터도 필요함
+        else:
+            loss = self.last_layer.forward(y, t)
+            
+        return loss + weight_decay
 
-        return self.last_layer.forward(y, t) + weight_decay
-
-    def accuracy(self, x, t, save_wrong_idxs=False, multiple_answers=False, verbose=False):
+    def accuracy(self, x, t, save_wrong_idxs=False, multiple_answers=False, verbose=False, percentage=True):
         batch_size = self.mini_batch_size
         # if len(t) % batch_size != 0:
         #     print(f"\n문제 수가 미니배치 수로 나누어 떨어지지 않음\n(뒤에 남는 {len(t) % batch_size}문제는 풀지 못함)")
@@ -294,9 +308,9 @@ class DeepConvNet:
             if verbose:
                 Fnum, Qnum = len(wrong_idxs), x.shape[0]
                 print(f"\n=== 총 {Qnum}문제, 정답 {Qnum-Fnum}개, 오답 {Fnum}개 (정답률: {math.floor(acc/x.shape[0]*100*100)/100}%) ===")
-            return acc / x.shape[0], wrong_idxs
+            return acc / x.shape[0] * (100 if percentage else 1), wrong_idxs
         else:
-            return acc / x.shape[0]
+            return acc / x.shape[0] * (100 if percentage else 1)
 
     def gradient(self, x, t):
         # forward
