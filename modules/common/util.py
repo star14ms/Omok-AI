@@ -140,8 +140,28 @@ class bcolors:
         for color in bcolors.c:
             print(color + "Warning: No active frommets remain. Continue?" + bcolors.ENDC)
 
-    def according_to(x):
-        if 0.5 <= x < 5:
+    def according_to_score(x):
+        if x < 1:
+            return bcolors.ENDC
+        elif 1 <= x < 20:
+            return bcolors.FAIL
+        elif 20 <= x < 40:
+            return bcolors.ORANGE
+        elif 40 <= x < 60:
+            return bcolors.WARNING
+        elif 60 <= x < 80:
+            return bcolors.OKGREEN
+        elif 80 <= x < 95:
+            return bcolors.OKBLUE
+        elif 95 <= x < 99:
+            return bcolors.HEADER
+        else:
+            return bcolors.BOLD
+    
+    def according_to_chance(x):
+        if x < 0.5:
+            return bcolors.ENDC
+        elif 0.5 <= x < 5:
             return bcolors.FAIL
         elif 5 <= x < 20:
             return bcolors.ORANGE
@@ -153,10 +173,8 @@ class bcolors:
             return bcolors.OKBLUE
         elif 95 <= x < 99:
             return bcolors.HEADER
-        elif 99 <= x:
-            return bcolors.BOLD
         else:
-            return bcolors.ENDC
+            return bcolors.BOLD
 
     def ANSI_codes():
         for i in range(0, 16):

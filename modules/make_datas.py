@@ -1,4 +1,5 @@
 import numpy as np
+from modules.common.util import shuffle_dataset
 
 class make_datas:
 
@@ -138,7 +139,7 @@ class split_datas:
         x_train, t_train = xb_datas[range(0, len_datas, 2)], t_datas[range(0, len_datas, 2)] ### 0, 1 X
         x_test, t_test = xb_datas[range(1, len_datas, 2)], t_datas[range(1, len_datas, 2)] ### 0, 1 X
     
-        return x_train, t_train, x_test, t_test
+        return (x_train, t_train), (x_test, t_test)
 
 def _change_one_hot_label(X):
         T = np.zeros((X.size, 225))
@@ -157,6 +158,18 @@ def _change_some_hot_labels(X):
 
     return T
     
+def sample_val(x_train, t_train, sample_size=500, validation_rate=0.2):
+    x_train, t_train = shuffle_dataset(x_train, t_train)
+    x_train = x_train[:sample_size]
+    t_train = t_train[:sample_size]
+
+    validation_num = int(x_train.shape[0] * validation_rate)
+    x_val = x_train[:validation_num]
+    t_val = t_train[:validation_num]
+    x_train = x_train[validation_num:]
+    t_train = t_train[validation_num:]
+    
+    return (x_train, t_train), (x_val, t_val)
 
 # # 학습할 문제들 보기
 # import random

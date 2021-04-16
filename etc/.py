@@ -117,6 +117,7 @@ print(1 in dic.values())
 
 c, d = dic.values()
 print(c, d)
+print(len(dic))
 
 line()
 
@@ -142,3 +143,19 @@ print(int(0.99999999999999999)) # 17
 # print()
 # for ID in range(257):
 #     print(f'\u001b[38;5;{ID}mHello\u001b[0m', end=f"{ID} ")
+
+line("±오차(한계) 구하기")
+
+val_accs = [1, 2, 3, 4, 5, 6, 7]
+
+average_acc = sum(val_accs) / len(val_accs)
+standard_deviation = ( sum( (np.array(val_accs)-average_acc)**2 ) / len(val_accs) ) ** (1/2) ### 
+standard_error = standard_deviation / (len(val_accs) ** (1/2))
+margin_of_error99 = round(3.3 * standard_error, 2)
+
+print(average_acc, standard_deviation, standard_error, margin_of_error99)
+
+line("tuple")
+
+a = (1, 2)
+print(a[1])

@@ -2,6 +2,7 @@ import numpy as np # 보드 만들기
 import pygame # 게임 화면 만들기
 import random 
 from datetime import datetime # 기보 날짜 기록
+from modules.common.util import bcolors
 
 # AI code (Human Made)
 from pygame_src.AI_code import *
@@ -10,7 +11,7 @@ from pygame_src.foul_detection import isFive, num_Four, num_Three
 # AI Deep Learning network
 from network import DeepConvNet
 
-network = DeepConvNet(saved_network_pkl="Momentum_lr=0.01_ln=28600_acc=99.93_params")
+network = DeepConvNet(saved_network_pkl="CR_CR_CR_CsumR_Smloss Momentum lr=0.01 ln=28600 acc=99.93 params")
 
 ################################################################ pygame code
 

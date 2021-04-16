@@ -31,7 +31,6 @@ def print_board(*args, mode="QnAI", num_answers=1):
     
     elif len(args) == 2:
         Q, A = args[0], args[1]
-        t_x, t_y = -1, -1
 
         if mode!="QnAI" and mode!="QnA":
             print("배열을 두개 받으면 QnA 또는 QnAI모드 출력만 가능")
@@ -54,6 +53,8 @@ def print_board(*args, mode="QnAI", num_answers=1):
     
     # print(mode)
     Q = Q.reshape(15, 15)
+    t_x, t_y = -1, -1
+    a_x, a_y = -1, -1
     
     if (mode=="QnA" or mode=="QnAI" or mode=="QnA_AI"):
         if A.shape[0] == 1:
@@ -103,8 +104,8 @@ def print_board(*args, mode="QnAI", num_answers=1):
                 print("\nprint_question_board() 오류!")
         print()
 
-    if mode == "QnAI":
-        print("\n🟤< 0.5% <🔴< 5% <🟠< 20% <🟡< 50% <🟢< 80% <🔵< 95% <🟣\n")
+    # if mode == "QnAI":
+    #     print("\n🟤< 0.5% <🔴< 5% <🟠< 20% <🟡< 50% <🟢< 80% <🔵< 95% <🟣\n")
 
 # 문제를 하나 골라 테스트 (index: 테스트 할 문제 위치)
 def test_pick(network, x_data, t_data, index):
@@ -113,6 +114,8 @@ def test_pick(network, x_data, t_data, index):
 
     scores = network.predict(x)
     a_x, a_y = scores.argmax()%15, scores.argmax()//15
+
+    scores_nomalized = ( (scores - np.min(scores)) / scores.ptp() * 100).reshape(15, 15)
 
     winning_odds = (softmax(scores)*100).reshape(15, 15) ### x.round(2) np.round_(x, 2)
     # winning_odds = np.where(winning_odds==winning_odds[a_y, a_x], winning_odds, 0)
@@ -124,18 +127,24 @@ def test_pick(network, x_data, t_data, index):
     #     chance = math.floor(winning_odds[t_yxs[idx][0], t_yxs[idx][1]]*100)/100
     #     t_yx_chances.append(chance)
     
-    print("\n=== 점수(scoress) ===")
-    print(scores.reshape(15, 15)) # .astype(int)
+    print("\n=== 점수(scores) ===")
+    np.set_printoptions(linewidth=np.inf, formatter={'all':lambda x: ( # 세자리 출력(100) 방지
+    bcolors.according_to_score(x) + str(int(np.minimum(x, 99))).rjust(2) + bcolors.ENDC)})
+    print(scores_nomalized) # .astype(int)
+
     print("\n=== 각 자리의 확률 분배(%) ===")
+    np.set_printoptions(linewidth=np.inf, formatter={'all':lambda x: (
+    bcolors.according_to_chance(x) + str(int(np.minimum(x, 99))).rjust(2) + bcolors.ENDC)})
     print(winning_odds)
+
     print(f"\n=== Q-{index} AI's Answer ===")
     print_board(x, winning_odds, t, mode="QnA_AI") # len(t_yxs) 답 여러개일 때
 
-    print(f"정답 좌표: x={t_x},{' ' if t_x<10 else ''}y={t_y} ({ math.floor(winning_odds[t_y, t_x]*100)/100 }%)", end=" / ")
+    print(f"정답 좌표: x={str(t_x).rjust(2)},y={str(t_y).rjust(2)} ({ math.floor(winning_odds[t_y, t_x]*100)/100 }%)", end=" / ")
     # print("정답 좌표: ", end="") # 답 여러개일 때
     # for t_yx, t_yx_chance in zip(t_yxs, t_yx_chances):
     #     print(f"{t_yx} ({t_yx_chance}%)", end=" / ")
-    print(f"\n구한 좌표: x={a_x},{' ' if a_x<10 else ''}y={a_y} ({ math.floor(winning_odds[a_y, a_x]*100)/100 }%)", end=" / ")
+    print(f"\n구한 좌표: x={str(a_x).rjust(2)},y={str(a_y).rjust(2)} ({ math.floor(winning_odds[a_y, a_x]*100)/100 }%)", end=" / ")
     print("정답!" if [a_y, a_x] == [t_y, t_x] else "응 아니야~")
     # print("정답!" if [a_y, a_x] in t_yxs else "응 아니야~")
 

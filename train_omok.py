@@ -5,17 +5,14 @@ from modules.make_datas import make_datas, split_datas
 import time
 from modules.plot import plot
 
-# 알람 울리기, 테스트
-import datetime as dt
-from selenium import webdriver
+# 테스트
 from modules.test import print_board, test_pick, test_random_picks, test_right_or_wrong_answers
 from modules.common.util import bcolors
-import random
 
 # 학습할 데이터 만들기
 # 가로 ~825, 세로 825~1650, \대각선 1650~2255, /대각선 2255~2860
 x_datas, t_datas = make_datas._4to5(score=1, blank_score=0)
-x_train, t_train, x_test, t_test = split_datas.even_odd(x_datas, t_datas)
+(x_train, t_train), (x_test, t_test) = split_datas.even_odd(x_datas, t_datas)
 mini_batch_size = 110 ### 다른 미니배치 수로 학습한 신경망을 불러오면 바뀌어버림
 
 train_network = False
@@ -23,20 +20,29 @@ saved_network_pkl = None
 saved_graphdata_pkl = None
 
 # ================================ < 주석을 풀면 학습 실행
-# train_network = True 
+train_network = True
 # ================================ v 주석을 풀면 신경망 불러오기
-# saved_network_pkl = "CR_CR_CR_CsumR_Smloss Momentum lr=0.01 ln=28600 acc=99.93 params"
-saved_graphdata_pkl = "CR_CR_CR_CsumR_N0sloss Momentum lr=0.01 ln=28600 acc=0.06 graphdata"
-# ================================ ^ 주석을 풀면 지난 학습정보 그래프 데이터 불러오기 (그래프 출력용)
+# saved_network_pkl = "Momentum0 lr_0.01 ln_28600 acc_99.93 CR_CR_CR_CsumR_Smloss params"
+# saved_network_pkl = "Adam lr=0.01 ln=28600 acc=30.62 CR_CR_CR_CR_AR_ASmloss params"
+# saved_network_pkl = "Adam lr_0.01 ln_28600 acc_7.72 CR_CR_CR_CR_AR_AN0sloss params"
+
+# ================================ v 주석을 풀면 지난 학습정보 그래프 데이터 불러오기 (그래프 출력용)
+# saved_graphdata_pkl = "Adam lr_0.01 ln_143000 acc_37.58 CR_CR_CR_CR_ANR_AN0sloss graphdata.pkl"
+
+if saved_graphdata_pkl != None:
+    graph_datas = load_graph_datas(saved_graphdata_pkl)
+    plot.loss_graph(graph_datas["train_losses"], smooth=True)
+    plot.accuracy_graph(graph_datas["train_accs"], graph_datas["test_accs"])
 
 # 신경망 생성
 network = DeepConvNet(saved_network_pkl=saved_network_pkl, mini_batch_size=mini_batch_size)
 
 # 학습
-trainer = Trainer(epochs=10, optimizer='Momentum', optimizer_param={'lr':0.01}, 
+trainer = Trainer(epochs=20, optimizer='Adam', optimizer_param={'lr':0.01}, 
     network=network, x_train=x_train, t_train=t_train, x_test=x_test, t_test=t_test,
     mini_batch_size=mini_batch_size)
 if train_network:
+    print("\n학습 시작!")
     start = time.time()
     trainer.train()
 
@@ -45,7 +51,7 @@ if train_network:
     h, m, s = (time_delta // 3600), (time_delta//60 - time_delta//3600*60), (time_delta % 60)
     print(f"\n{h}h {m}m {s}s") 
 
-# 학습된 신경망, 그래프 데이터 저장
+# 학습된 신경망, 그래프 데이터 저장, 학습 그래프 출력
 if train_network:
     a = input("\n네트워크를 저장할거니? 예(any)/아니오(f) : ")
     if a != "f" and a != "ㄹ":
@@ -59,23 +65,12 @@ if train_network:
     else:
         print("저장 안했다^^")
 
-# 그래프 출력
-if train_network:
     plot.loss_graph(trainer.train_losses, smooth=False)
     plot.accuracy_graph(trainer.train_accs, trainer.test_accs)
-if saved_graphdata_pkl != None:
-    graph_datas = load_graph_datas(saved_graphdata_pkl)
-    plot.loss_graph(graph_datas["train_losses"], smooth=False)
-    plot.accuracy_graph(graph_datas["train_accs"], graph_datas["test_accs"])
 
-np.set_printoptions(linewidth=np.inf, formatter={'all':lambda x: ( # precision=0, suppress=True, 
-    bcolors.according_to(x) + (" " if x<10 else "") + str(int(x)) + bcolors.ENDC)})
-bcolors.ANSI_codes()
-# 정확도 구하고 맞거나 틀린 문제 확인
-# accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True, verbose=True) # , multiple_answers=True
-# test_right_or_wrong_answers(network, x_datas, t_datas, wrong_idxs)
-
-# 테스트
+# 정확도 구하고, 맞은 or 틀린 문제 확인, 테스트
+accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True, verbose=True) # , multiple_answers=True
+test_right_or_wrong_answers(network, x_datas, t_datas, wrong_idxs)
 test_random_picks(network, x_datas, t_datas) # 4to5 (0, 825), (825, 1650), (1650, 2255), (2255, 2860)
 # test_pick(network, x_datas, t_datas, 0)
 
@@ -94,6 +89,7 @@ test_random_picks(network, x_datas, t_datas) # 4to5 (0, 825), (825, 1650), (1650
 # # 손실 함수가 높아지는 이유: 답이 2개이기 때문에 softmax확률이 5:5로 분배됨, 임의로 정답 라벨을 수정해버려서
 # from modules.common.functions import softmax, cross_entropy_error
 # from modules.common.layers import Not0SamplingLoss
+# import random
 # idx, num = 0, 2
 # x, t = x_datas[idx:idx+num], t_datas[idx:idx+num]
 

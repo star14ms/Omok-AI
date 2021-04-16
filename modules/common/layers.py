@@ -127,7 +127,9 @@ class SoftmaxWithLoss:
             dx = self.y.copy(self.t)
             dx[np.arange(batch_size), self.t] -= 1
             dx = dx / batch_size
-        
+        # print("\n역전파 기울기:")
+        # print((dx[0]*10000).reshape(15, 15).astype(int))
+        # time.sleep(8)
         return dx
 
 
@@ -203,7 +205,8 @@ class BatchNormalization:
         else:
             xc = x - self.running_mean
             xn = xc / ((np.sqrt(self.running_var + 10e-7)))
-            
+        print(self.input_shape)
+        print(self.gamma.shape, xn.shape, self.beta.shape)
         out = self.gamma * xn + self.beta 
         return out
 
@@ -263,7 +266,7 @@ class Convolution:
         # print(col.shape, col_W.shape)
         out = np.dot(col, col_W) + self.b
         out = out.reshape(N, out_h, out_w, -1).transpose(0, 3, 1, 2)
-        # print("x,w,out:", x.shape, self.W.shape, out.shape) #
+        print("x,w,out:", x.shape, self.W.shape, out.shape) #
         self.x = x
         self.col = col
         self.col_W = col_W
@@ -558,7 +561,7 @@ class NegativeSamplingLoss:
     #     return dh
     
 # from modules.test import print_board
-# import time
+import time
 
 class Not0SamplingLoss: # 정답 오답 인덱스에만 기울기 전하기 ## num0를 푸는 문제마다 달라지게 할 수 있을까?
     def __init__(self, not0_num):
