@@ -1,15 +1,17 @@
-from learning.make_datas import make_4to5_datas
-from learning.deep_convnet import DeepConvNet
-from learning.common.trainer import Trainer
-import datetime, time
+from modules.make_datas import make_datas, split_datas
+from network import DeepConvNet
+from modules.common.trainer import Trainer
+import datetime as dt
+import time
+# 알람 울리기
+import datetime as dt
+from selenium import webdriver
 
 start = time.time()
 
 # 학습할 데이터 만들기
-x_datas, t_datas, t_datas_real = make_4to5_datas(score=1, blank_score=0)
-len_datas = x_datas.shape[0] # 가로 ~825, 세로 825~1650, \대각선 1650~2255, /대각선 2255~2860
-x_train, t_train = x_datas[range(0, len_datas, 2)], t_datas_real[range(0, len_datas, 2)] ### 0, 1 X
-x_test, t_test = x_datas[range(1, len_datas, 2)], t_datas_real[range(1, len_datas, 2)] ### 0, 1 X
+x_datas, t_datas, t_datas_real = make_datas._4to5(score=1, blank_score=0)
+x_train, t_train, x_test, t_test = split_datas.even_odd(x_datas, t_datas)
 
 # 학습 정보 출력 함수 정의
 def print_learning_info(acc_list, attempts_number):
@@ -36,33 +38,29 @@ def print_learning_info(acc_list, attempts_number):
         print()
 
 # 매개변수 생성
-# 'SGD', 'Momentum', 'Adagrad', 'Adam', 'Nesterov', 'Rmsprop'
-optimizers = ['SGD', 'Momentum', 'Nesterov', 'Rmsprop'] 
-exponents = range(1, -4, -1) # 1, -7, -1
-
-attempts_number = 10
-give_up={'epoch':3, 'test_acc':0.1}
-
+exponents = {       # 0, -7, -1
+    'SGD':      range(-1, -2, -1),
+    'Momentum': range(-2, -3, -1), 
+    'Adagrad':  range(-2, -3, -1), 
+    'Adam':     range(-2, -3, -1), 
+    'Nesterov': range(-2, -3, -1), 
+    'Rmsprop':  range(-3, -4, -1),
+}
+attempts_number = 5
 epochs = 10
+
+give_up = {'epoch': 3} # 'test_acc':0.1
 mini_batch_size = 110
 
+print(f"\nattempts:{attempts_number}, epochs:{epochs}")
+
 # 매개변수 최적화 방법과 학습률에 따른 딥러닝 효율 비교
-for optimizer in optimizers:
+for optimizer in exponents:
     print("\noptimizer: " + str(optimizer))
-    for exponent in exponents:
+    for exponent in exponents[optimizer]:
         acc_list = []
         for _ in range(attempts_number):
-            network = DeepConvNet(
-                layers_info = [
-                    'convEnd', 'Relu',
-                    'softmax'
-                ], params = [(1, 15, 15),
-                    # {'filter_num':10, 'filter_size':1, 'pad':0, 'stride':1},
-                    # {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
-                    # {'filter_num':10, 'filter_size':5, 'pad':2, 'stride':1},
-                    # {'filter_num':10, 'filter_size':7, 'pad':3, 'stride':1},
-                    {'filter_num':10, 'filter_size':9, 'pad':4, 'stride':1},
-                ], mini_batch_size=mini_batch_size)
+            network = DeepConvNet(mini_batch_size=mini_batch_size)
             
             trainer = Trainer(epochs=epochs, optimizer=optimizer, optimizer_param={'lr':10 ** exponent}, verbose=False, 
                 mini_batch_size=mini_batch_size, give_up=give_up, verbose_epoch=False,
@@ -77,8 +75,9 @@ for optimizer in optimizers:
         print_learning_info(acc_list, attempts_number)
 
 
-time_delta = time.time() - start
-print(f"\n{ time_delta // 3600 }h { time_delta//60 - time_delta//3600*60 }m { time_delta % 60 }s")
+time_delta = int(time.time() - start)
+h, m, s = (time_delta // 3600), (time_delta//60 - time_delta//3600*60), (time_delta % 60)
+print(f"\n{h}h {m}m {s}s")
 
 # 학습 끝나면 알람 울리기
 now = dt.datetime.today()
