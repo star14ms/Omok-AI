@@ -4,14 +4,14 @@ import random
 from datetime import datetime # 기보 날짜 기록
 from modules.common.util import bcolors
 
-# AI code (Human Made)
+# AI code (Human Made Algorithm)
 from pygame_src.AI_code import *
 from pygame_src.foul_detection import isFive, num_Four, num_Three
 
 # AI Deep Learning network
 from network import DeepConvNet
 
-network = DeepConvNet(saved_network_pkl="CR_CR_CR_CsumR_Smloss Momentum lr=0.01 ln=28600 acc=99.93 params")
+network = DeepConvNet(saved_network_pkl="4to5, 3to4 (2) acc_99.97 ln_48000 Adam2 lr_0.01 CR_CR_CR_CsumR_Smloss params")
 
 ################################################################ pygame code
 
@@ -273,8 +273,8 @@ while not exit:
                     else:
                         game_mode = game_mode_origin
                 elif event.key == pygame.K_F9: # AI vs AI mode on/off
-                    if AI_mode != "Human_made_Algorithms":
-                        AI_mode = "Human_made_Algorithms"
+                    if AI_mode != "Human_Made_Algorithms":
+                        AI_mode = "Human_Made_Algorithms"
                     else:
                         AI_mode = "Deep_Learning"
                 elif event.key == pygame.K_ESCAPE: # 창 닫기
@@ -399,7 +399,7 @@ while not exit:
                     if game_mode=="AI_vs_AI" or (game_mode=="Human_vs_AI" and whose_turn == 1 and not game_over):
                         
                         # 사람이 생각한 알고리즘
-                        if AI_mode == "Human_made_Algorithms":
+                        if AI_mode == "Human_Made_Algorithms":
                             x, y = AI_think_win_xy(whose_turn, size, board)
                         # 딥러닝 신경망 AI
                         else:

@@ -63,6 +63,7 @@ class plot:
     def many_accuracy_graphs(results_train, results_val, graph_draw_num=9, col_num=3, sort=True, verbose=True):
         row_num = int(np.ceil(graph_draw_num / col_num))
         i = 0
+        print()
         
         if sort:
             results_val_items = sorted(results_val.items(), key=lambda x:x[1][-1], reverse=True)
@@ -92,6 +93,7 @@ class plot:
     def many_loss_graphs(results_losses, graph_draw_num=9, col_num=3, sort=True, smooth=True, verbose=True):
         row_num = int(np.ceil(graph_draw_num / col_num))
         i = 0
+        print()
         
         if sort:
             losses_train_items = sorted(results_losses.items(), key=lambda x:x[1][-1], reverse=False)
@@ -120,3 +122,50 @@ class plot:
                 break
         
         plt.show()
+
+
+    def filter_show(filters, filters_name, nx=5, margin=3, scale=10):
+        """
+        c.f. https://gist.github.com/aidiary/07d530d5e08011832b12#file-draw_weight-py
+        """
+        FN, C, FH, FW = filters.shape
+        ny = int(np.ceil(FN / nx))
+    
+        fig = plt.figure()
+        fig.subplots_adjust(left=0, right=1, bottom=0, top=1, hspace=0.05, wspace=0.05)
+    
+        for i in range(FN):
+            ax = fig.add_subplot(ny, nx, i+1, xticks=[], yticks=[])
+            plt.title(f"{filters_name} ({i+1})") ### plot() 후에 나와야 함
+            ax.imshow(filters[i, 0], cmap=plt.cm.gray_r, interpolation='nearest')
+        plt.show()
+
+    def all_filters_show(network, nx=5):
+        for key in network.params.keys():
+            if network.params[key].ndim == 4:
+                plot.filter_show(network.params[key], filters_name=key, nx=nx)
+
+
+    def compare_filter(filters1, filters2, filters_name, nx=10):
+        FN, C, FH, FW = filters1.shape
+        ny = int(np.ceil(FN / nx)) * 2
+    
+        fig = plt.figure()
+        fig.subplots_adjust(left=0, right=1, bottom=0, top=0.95, hspace=0.3, wspace=0.3)
+    
+        for i in range(FN):
+            line = i // nx
+            ax = fig.add_subplot(ny, nx, nx*line+i+1, xticks=[], yticks=[])
+            plt.title(f"{filters_name} ({i+1})")
+            ax.imshow(filters1[i, 0], cmap=plt.cm.gray_r, interpolation='nearest')
+        
+            ax = fig.add_subplot(ny, nx, nx*line+i+1+nx, xticks=[], yticks=[])
+            plt.title(f"↓")
+            ax.imshow(filters2[i, 0], cmap=plt.cm.gray_r, interpolation='nearest')
+        plt.show()
+    
+    def all_filters_compare(params1, params2, nx=5):
+        for key in params1.keys():
+            if params1[key].ndim == 4:
+                plot.compare_filter(params1[key], params2[key], key, nx=nx)
+        

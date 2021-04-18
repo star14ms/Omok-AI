@@ -205,8 +205,8 @@ class BatchNormalization:
         else:
             xc = x - self.running_mean
             xn = xc / ((np.sqrt(self.running_var + 10e-7)))
-        print(self.input_shape)
-        print(self.gamma.shape, xn.shape, self.beta.shape)
+        # print(self.input_shape)
+        # print(self.gamma.shape, xn.shape, self.beta.shape)
         out = self.gamma * xn + self.beta 
         return out
 
@@ -266,7 +266,7 @@ class Convolution:
         # print(col.shape, col_W.shape)
         out = np.dot(col, col_W) + self.b
         out = out.reshape(N, out_h, out_w, -1).transpose(0, 3, 1, 2)
-        print("x,w,out:", x.shape, self.W.shape, out.shape) #
+        # print("x,w,out:", x.shape, self.W.shape, out.shape) #
         self.x = x
         self.col = col
         self.col_W = col_W

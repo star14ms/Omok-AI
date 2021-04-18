@@ -120,13 +120,14 @@ class Trainer:
             print("test acc: " + str(round(test_acc, 2)) + "%")
 
 
-    def save_graph_datas(self, network, save_inside_dir=True, pkl_dir="saved_pkls"):
+    def save_graph_datas(self, network, str_data_info, save_inside_dir=True, pkl_dir="saved_pkls"):
         
         if len(self.test_accs) == 0:
             acc = network.saved_network_pkl.split(" ")[-3].lstrip("acc_")
         else:
             acc = math.floor(self.test_accs[-1]*100)/100
-        file_name = f"{self.optimizer.__class__.__name__} lr_{self.optimizer.lr} ln_{network.learning_num} acc_{acc} {network.network_dir} graphdata.pkl"
+        file_name = f"{str_data_info} acc_{acc} ln_{network.learning_num} " + \
+            f"{self.optimizer.__class__.__name__} lr_{self.optimizer.lr} {network.network_dir} learninginfo.pkl"
         file_path = file_name
 
         if save_inside_dir:

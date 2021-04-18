@@ -8,38 +8,38 @@ from collections import OrderedDict
 from common.layers import *
 from modules.test import print_board
 import math # save_params에서 acc에 floor사용, accuracy에서 ceil 사용
+from modules.common.util import bcolors, __get_logger
+
+logger = __get_logger()
+# logger.critical("hello")
 
 class DeepConvNet:
     
     def __init__(self, 
         layers_info = [
-            'Conv', 'Norm', 'Relu',
-            'Conv', 'Norm', 'Relu',
-            'Conv', 'Norm', 'Relu',
-            'Conv', 'Norm', 'Relu',
-            'Affine', 'Norm', 'Relu',
-            'Affine','Not0SamplingLoss', 
-            # 'SoftmaxLoss'
+            'Conv', 'Relu',
+            'Conv', 'Relu',
+            'Conv', 'Relu',
+            'ConvSum', 'Relu',
+            'SoftmaxLoss'
         ], params_ = [(1, 15, 15),
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
-            225, 225
         ], dropout_ration=0.5, pooling_params={"pool_h": 2, "pool_w": 2, "stride": 2}, 
-           weight_decay_lambda=0, mini_batch_size=110, saved_network_pkl=None, not0_size=4):
-
-        layers_info = [layer.lower() for layer in layers_info]
-        # print(layers_info)
-        self.network_infos = {} # pkl파일에 저장할 신경망 정보
+           weight_decay_lambda=0, mini_batch_size=100, saved_network_pkl=None, not0_size=4):
         
+        layers_info = [layer.lower() for layer in layers_info]
+        self.network_infos = {} # pkl파일에 저장할 신경망 정보
+        # print(layers_info)
         # 신경망 정보에 넣을 내용
         self.layers_info = layers_info
         self.params_ = params_
         self.dropout_ration = dropout_ration
         self.pooling_params = pooling_params
         self.weight_decay_lambda = weight_decay_lambda
-        self.mini_batch_size = mini_batch_size
+        self.mini_batch_size = mini_batch_size ### 다른 미니배치 수로 학습한 신경망을 불러오면 바뀌어버림
         self.saved_network_pkl = saved_network_pkl
         self.learning_num = 0 # 문제를 학습한 횟수
         self.params = {} # 레이어의 가중치와 편향들 저장
@@ -65,144 +65,134 @@ class DeepConvNet:
         layers_info_str = ""
         for layer in self.layers_info:
             if layer == "conv":
-                layers_info_str = layers_info_str + "C"
+                layers_info_str = layers_info_str + "_C"
             elif layer == "convsum":
-                layers_info_str = layers_info_str + "Csum"
+                layers_info_str = layers_info_str + "_Csum"
             elif layer == "affine":
-                layers_info_str = layers_info_str + "A"
+                layers_info_str = layers_info_str + "_A"
             elif layer == "relu":
-                layers_info_str = layers_info_str + "R_"
+                layers_info_str = layers_info_str + "R"
             elif "norm" in layer:
                 layers_info_str = layers_info_str + "N"
+            elif "dropout" in layer:
+                layers_info_str = layers_info_str + "D"
             elif layer == "softmaxloss" or layer == "smloss":
-                layers_info_str = layers_info_str + "Smloss"
+                layers_info_str = layers_info_str + "_Smloss"
             elif layer == "not0samplingloss" or "not0samploss":
-                layers_info_str = layers_info_str + "N0sloss"
+                layers_info_str = layers_info_str + "_N0sloss"
+        self.network_dir = layers_info_str.lstrip("_")
 
-        # params_info_str = str(params_).replace(":", "").replace("'", "").replace(
-        #     '"','').replace("filter_num ", "").replace("filter_size ", "").replace(
-        #     "pad ", "").replace("stride ", "").replace(", ", " ")
-
-        self.network_dir = layers_info_str #  {params_info_str}
-
-        # 각 층의 뉴런 하나에 연결된 노드 수 저장
-        node_nums = np.array([0 for i in range(len(params_))])
-        conv_params = []
-        pre_Sum_Cannels = False
+        # 매개변수를 사용하는 층의 뉴런 하나당 앞 층과 연결된 노드 수, 출력 크기 계산
+        node_nums = np.array([0 for i in range(len(params_)-1)])
+        out_sizes = np.array([0 for i in range(len(params_)-1)])
+        pre_sum_cannels = False
+        idx = 0 # 매개변수를 사용하는 층의 위치
         feature_map_size = params_[0][1] if type(params_[0]) == tuple else params_[0]
-        idx = 0
         for layer_idx, layer in enumerate(layers_info):
             
             if 'conv' in layer or 'convolution' in layer:
-    
-                if type(params_[idx]) == tuple: ### 'tuple'
-                    if type(params_[idx+1]) == dict:
-                        node_nums[idx] = params_[idx][0] * (params_[idx+1]['filter_size'] ** 2)
-                    else:
-                        print(f"error : node num idx {idx}에서 오류1\nnode_nums={node_nums}")
-                    conv_params.append(params_[idx+1])
+                if type(params_[idx+1]) == dict:
 
-                elif type(params_[idx]) == dict:
-                    if type(params_[idx+1]) == dict:
-                        node_nums[idx] = params_[idx]['filter_num'] * (params_[idx+1]['filter_size'] ** 2)
-                    else:
-                        print(f"error : node num idx {idx}에서 오류2\nnode_nums={node_nums}")
-                    conv_params.append(params_[idx+1])
+                    if type(params_[idx]) == tuple: ### 'tuple'
+                        node_nums[idx] = params_[idx+1]['filter_size'] ** 2
 
+                    elif type(params_[idx]) == dict:
+                        node_nums[idx] = params_[idx+1]['filter_size'] ** 2 * params_[idx]['filter_num']
+
+                    else:
+                        logger.warning(f"node num idx {idx}에서 오류\nnode_nums={node_nums}" + \
+                        f"\nparams_의 {type(params_[idx])} 타입은 이전 노드 수를 어떻게 구해야 할 지 모르겠다")
                 else:
-                    print(f"error : node num idx {idx}에서 오류3\nnode_nums={node_nums}")
+                    logger.warning(f"node num idx {idx}에서 오류\nnode_nums={node_nums}" + \
+                    f"\nError: params_의 conv위치에는 합성곱 계층 정보(dic)가 들어가야 한다.")
+                
+                # 채널들을 합치는 합성곱 계층이었나 여부를 저장 (다음 노드 수가 달라짐: /채널 수)
+                pre_sum_cannels = True if 'sum' in layer else False
                 
                 # 특징 맵 크기 구하기
+                if ( feature_map_size + 2*params_[idx+1]['pad'] - params_[idx+1]['filter_size'] ) % params_[idx+1]['stride'] != 0:
+                    logger.warning(
+                        f"합성곱 계층 출력 크기가 정수가 아님" + \
+                    "({feature_map_size} + 2*{params_[idx+1]['pad']} - {params_[idx+1]['filter_size']}) / {params_[idx+1]['stride']}")
+
                 feature_map_size = (( feature_map_size + 2*params_[idx+1]['pad'] - params_[idx+1]['filter_size'] ) / params_[idx+1]['stride']) + 1
-                
-                if feature_map_size % params_[idx+1]['stride'] != 0:
-                    print("Error: 합성곱 계층 출력 크기가 정수가 아님")
+                out_sizes[idx] = feature_map_size**2 * (params_[idx+1]['filter_num'] if 'sum' not in layer else 1)
                 idx += 1
-                
-                # 채널들을 합치는 합성곱 계층인지 여부를 저장 (다음 노드 수가 달라짐: /채널 수)
-                pre_Sum_Cannels = True if 'sum' in layer else False
                     
-            elif layer == 'pool' or layer == 'pooling':
+            elif layer == 'pool' or layer == 'poolin0g':
                 if (feature_map_size - self.pooling_params["pool_h"]) % self.pooling_params["stride"] != 0:
-                    print("Error: 풀링 계층 출력 크기가 정수가 아님")
+                    logger.warning("풀링 계층 출력 크기가 정수가 아님")
                 feature_map_size = (feature_map_size - self.pooling_params["pool_h"]) / self.pooling_params["stride"] + 1
 
             elif layer == 'affine':
+                if type(params_[idx+1]) == int:
 
-                if type(params_[idx]) == dict:
-                    if type(params_[idx+1]) == int:
-                        if pre_Sum_Cannels:
-                            node_nums[idx] = feature_map_size**2
-                            pre_Sum_Cannels = False
-                        else:
-                            node_nums[idx] = params_[idx]['filter_num'] * (feature_map_size**2)
-                            
-                        node_nums[idx+1] = params_[idx+1] ### affine은 앞뒤 노드 수가 모두 필요함
-                    else:
-                        print(f"error : node num idx {idx}에서 오류4\nnode_nums={node_nums}")
-                    conv_params.append(params_[idx])
+                    if type(params_[idx]) == dict:
+                        node_nums[idx] = (feature_map_size**2) * (params_[idx]['filter_num'] if not pre_sum_cannels else 1)
+                        pre_sum_cannels = False
 
-                elif type(params_[idx]) == int:
-                    if type(params_[idx+1]) == int:
+                    elif type(params_[idx]) == int:
                         node_nums[idx] = params_[idx]
-                        node_nums[idx+1] = params_[idx+1]
-                    else:
-                        print(f"error : node num idx {idx}에서 오류5\nnode_nums={node_nums}")
 
-                elif type(params_[idx]) == tuple:
-                    if type(params_[idx+1]) == int:
+                    elif type(params_[idx]) == tuple:
                         node_nums[idx] = params_[idx][1] * params_[idx][2]
-                        node_nums[idx+1] = params_[idx+1]
                     else:
-                        print(f"error : node num idx {idx}에서 오류6\nnode_nums={node_nums}")
+                        logger.warning(f"node num idx {idx}에서 오류\nnode_nums={node_nums}" + \
+                        f"Error: params_의 {type(params_[idx])} 타입은 이전 노드 수를 어떻게 구해야 할 지 모르겠다")
+
                 else:
-                    print(f"error : node num idx {idx}에서 오류7")
+                    logger.warning(f"node num idx {idx}에서 오류\nnode_nums={node_nums}" + \
+                    f"Error: params_의 affine에는 이전 노드 개수(int)가 들어가야 한다.")
 
                 feature_map_size = node_nums[idx]
+                out_sizes[idx] = params_[idx+1] ### affine은 앞뒤 노드 수가 모두 필요함
                 idx += 1
 
-        if node_nums[-1] == 0: ### 마지막 가중치 초깃값 설정에서 0으로 나누기 방지
-            node_nums = np.delete(node_nums, -1)
+            # print(feature_map_size)
+        
         # node_nums = np.array([1*3*3, 16*3*3, 16*3*3, 32*3*3, 32*3*3, 64*3*3, 64*4*4, 50, 10])
-        print(node_nums)
-
+        # print("매개변수를 사용하는 레이어들의")
+        # print(node_nums, "이전 노드 개수")
+        # print(out_sizes, "출력 크기")
+        
         # 가중치 초깃값 설정
         if 'relu' in layers_info:
             weight_init_scales = np.sqrt(2.0 / node_nums) # He 초깃값
-        elif ('sigmoid' in layers_info) or ('tanh' in layers_info):
+        elif 'sigmoid' in layers_info or 'tanh' in layers_info:
             weight_init_scales = np.sqrt(1.0 / node_nums) # Xavier 초깃값
         else:
             weight_init_scales = 0.01
             print("\nError: There is no activation function. (relu or sigmoid or tanh)\n")
-
+        
         # 신경망 생성
-        idx = 0
+        idx = 0 # 가중치를 사용하는 레이어의 위치
         pre_channel_num = params_[0][0] if type(params_[0]) == tuple else params_[0] ### params_[0][1]
         for layer_idx, layer in enumerate(layers_info):
 
             if 'conv' in layer or 'convolution' in layer:
-                self.params['W' + str(idx+1)] = weight_init_scales[idx] * np.random.randn(  conv_params[idx]['filter_num'], 
-                    pre_channel_num, conv_params[idx]['filter_size'], conv_params[idx]['filter_size']  )
-                self.params['b' + str(idx+1)] = np.zeros(conv_params[idx]['filter_num'])
-                pre_channel_num = conv_params[idx]['filter_num']
+                self.params['W' + str(idx+1)] = weight_init_scales[idx] * np.random.randn(  
+                    params_[idx+1]['filter_num'], pre_channel_num, 
+                    params_[idx+1]['filter_size'], params_[idx+1]['filter_size'])
+                self.params['b' + str(idx+1)] = np.zeros(params_[idx+1]['filter_num'])
+                pre_channel_num = params_[idx+1]['filter_num']
 
                 self.layers.append(Convolution(self.params['W' + str(idx+1)], self.params['b' + str(idx+1)], 
-                conv_params[idx]['stride'], conv_params[idx]['pad'], reshape_2dim= (False if 'sum' not in layer else True) ))
+                params_[idx+1]['stride'], params_[idx+1]['pad'], reshape_2dim= (False if 'sum' not in layer else True) ))
                 
                 self.layer_idxs_used_params.append(layer_idx)
                 idx += 1
 
             elif layer == 'affine':
-                self.params['W' + str(idx+1)] = weight_init_scales[idx] * np.random.randn( node_nums[idx], node_nums[idx+1] )
-                self.params['b' + str(idx+1)] = np.zeros(node_nums[idx+1])
+                self.params['W' + str(idx+1)] = weight_init_scales[idx] * np.random.randn( node_nums[idx], out_sizes[idx] )
+                self.params['b' + str(idx+1)] = np.zeros(out_sizes[idx])
                 self.layers.append(Affine(self.params['W' + str(idx+1)], self.params['b' + str(idx+1)]))
+                
                 self.layer_idxs_used_params.append(layer_idx)
                 idx += 1
 
             elif layer == 'norm' or layer == 'batchnorm':
-                # print(idx)
-                self.params['gamma' + str(idx)] = np.ones(node_nums[idx])
-                self.params['beta' + str(idx)] = np.zeros(node_nums[idx])
+                self.params['gamma' + str(idx)] = np.ones(out_sizes[idx-1])
+                self.params['beta' + str(idx)] = np.zeros(out_sizes[idx-1])
                 self.layers.append(BatchNormalization(self.params['gamma' + str(idx)], self.params['beta' + str(idx)]))
                 
             elif layer == 'relu':
@@ -210,7 +200,10 @@ class DeepConvNet:
             elif layer == 'sigmoid':
                 self.layers.append(Sigmoid())
             elif layer == 'pool' or layer == 'pooling':
-                self.layers.append(Pooling(pool_h=self.pooling_params["pool_h"], pool_w=self.pooling_params["pool_w"], stride=self.pooling_params["stride"]))
+                self.layers.append(Pooling(
+                pool_h=self.pooling_params["pool_h"], 
+                pool_w=self.pooling_params["pool_w"], 
+                stride=self.pooling_params["stride"]))
             elif layer == 'dropout' or layer == 'drop':
                 self.layers.append(Dropout(self.dropout_ration))
             elif 'softmaxloss' in layers_info or 'softloss' in layers_info:
@@ -224,9 +217,8 @@ class DeepConvNet:
             else:
                 print(f"\nError: Undefined layer ({layer})\n")
                 return False
-        # print(layers_info)
-        # print(self.layers)
-
+        
+        # 불러온 신경망의 매개변수들 덮어쓰기
         if saved_network_pkl != None:
             self.params = self.loaded_params ### 네트워크를 self.params에 옮기지 않았음 
             for i, layer_idx in enumerate(self.layer_idxs_used_params): ### layers, layer_idxs_used_params 먼저 로드해야 함
@@ -345,14 +337,14 @@ class DeepConvNet:
 
         return grads
 
-    def save_params(self, trainer, save_inside_dir=True, pkl_dir="saved_pkls"):
+    def save_params(self, trainer, str_data_info, save_inside_dir=True, pkl_dir="saved_pkls"):
         
         self.network_infos["layers_info"]         = self.layers_info
         self.network_infos["params_"]             = self.params_
         self.network_infos["dropout_ration"]      = self.dropout_ration
         self.network_infos["pooling_params"]      = self.pooling_params
         self.network_infos["weight_decay_lambda"] = self.weight_decay_lambda
-        self.network_infos["mini_batch_size"]     = self.mini_batch_size
+        # self.network_infos["mini_batch_size"]     = self.mini_batch_size
         self.network_infos["saved_network_pkl"]   = self.saved_network_pkl
         self.network_infos["learning_num"]        = self.learning_num
         self.network_infos["params"]              = self.params
@@ -367,7 +359,8 @@ class DeepConvNet:
         else:
             acc = math.floor(trainer.test_accs[-1]*100)/100
         
-        file_name = f"{trainer.optimizer.__class__.__name__} lr_{trainer.optimizer.lr} ln_{self.learning_num} acc_{acc} {self.network_dir} params.pkl"
+        file_name = f"{str_data_info} acc_{acc} ln_{self.learning_num} " + \
+            f"{trainer.optimizer.__class__.__name__} lr_{trainer.optimizer.lr} {self.network_dir} params.pkl"
         file_path = file_name
         
         if save_inside_dir: ### if save_inside_dir: 안에 선언이 있으면 선언되지 않을 수 있음
@@ -427,23 +420,23 @@ class DeepConvNet:
         self.saved_network_pkl   = network_infos["saved_network_pkl"] 
         self.learning_num        = network_infos["learning_num"]
 
-        self.loaded_params = network_infos["params"]
+        params = network_infos["params"]
+        for key, val in params.items():
+            self.params[key] = val
+        # self.loaded_params = network_infos["params"] ### 복사가 아닌 저장된 위치를 가리킴
         # self.layers = network_infos["layers"] # pkl파일 용량이 너무 커짐
         # self.layer_idxs_used_params = network_infos["layer_idxs_used_params"] ### 새로운 레이어들이 또 append됨
         
         # print(network_infos["layers_info"], network_infos["learning_num"], network_infos["saved_network_pkl"] )
 
-        # params = network_infos["params"]
-        # for key, val in params.items():
-        #     self.params[key] = val
         
-        if self.mini_batch_size != network_infos["mini_batch_size"]:
-            print("\nError: '불러올 신경망의 미니배치 수'와 '처음 선언한 미니배치 수'가 일치하지 않는다", end=" ")
-            print("(앞으로 풀 문제의 수를 나누어 떨어지게 하는 것이 좋음)")
-            answer = input("\n어느 것을 선택하시겠습니까? 선언한 수(any)/불러온 수(1): ")
-            if answer == "1":
-                self.mini_batch_size = network_infos["mini_batch_size"] 
-            print("미니배치 수", self.mini_batch_size, "선택")
+        # if self.mini_batch_size != network_infos["mini_batch_size"]:
+        #     print("\nError: '불러올 신경망의 미니배치 수'와 '처음 선언한 미니배치 수'가 일치하지 않는다", end=" ")
+        #     print("(앞으로 풀 문제의 수를 나누어 떨어지게 하는 것이 좋음)")
+        #     answer = input("\n어느 것을 선택하시겠습니까? 선언한 수(any)/불러온 수(1): ")
+        #     if answer == "1":
+        #         self.mini_batch_size = network_infos["mini_batch_size"] 
+        #     print("선택한 미니배치 수: ", self.mini_batch_size)
 
         print(f"\n네트워크 불러오기 성공!\n({file_name})")
         
@@ -483,6 +476,6 @@ class DeepConvNet:
         print_board(board, mode="Q")
         print("\n=== AI's Answer ===")
         print_board(board, winning_odds, mode="QnAI")
-        print(f"구한 좌표: x={str(x).rjust(2)},y={str(y).rjust(2)} ({ math.floor(winning_odds[y, x]*100)/100 }%)")
+        print(f"구한 좌표: x={str(x).rjust(2)}, y={str(y).rjust(2)} ({ math.floor(winning_odds[y, x]*100)/100 }%)")
 
         return x, y
