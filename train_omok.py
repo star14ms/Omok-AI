@@ -52,7 +52,7 @@ if train_network:
 if train_network:
     a = input("\n네트워크를 저장할거니? 예(any)/아니오(f) : ")
     if a != "f" and a != "ㄹ":
-        network.save_params(trainer, str_data_info)
+        network.save_params(trainer.optimizer, trainer.optimizer.lr, trainer.test_accs, str_data_info)
     else:
         print("저장 안했다^^")
             
@@ -69,7 +69,7 @@ if train_network:
 # 정확도 구하고, 맞은 or 틀린 문제 확인, 테스트
 # accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True, verbose=True) # , multiple_answers=True
 # test.right_or_wrong_answers(network, x_datas, t_datas, wrong_idxs)
-# test.random_picks(network, x_datas, t_datas) # 4to5 (0, 825), (825, 1650), (1650, 2255), (2255, 2860)
+test.random_picks(network, x_datas, t_datas) # 4to5 (0, 825), (825, 1650), (1650, 2255), (2255, 2860)
 # test.pick(network, x_datas, t_datas, 0)
 
 # # 합성곱 필터 시각화하기

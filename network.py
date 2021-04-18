@@ -7,20 +7,20 @@ import numpy as np
 from collections import OrderedDict
 from common.layers import *
 from modules.test import print_board
-import math # save_params에서 acc에 floor사용, accuracy에서 ceil 사용
+import math
 from modules.common.util import bcolors, __get_logger
+from pygame_src.foul_detection import isFoul
 
 logger = __get_logger()
-# logger.critical("hello")
 
 class DeepConvNet:
     
     def __init__(self, 
         layers_info = [
-            'Conv', 'Relu',
-            'Conv', 'Relu',
-            'Conv', 'Relu',
-            'ConvSum', 'Relu',
+            'Conv', 'Norm', 'Relu',
+            'Conv', 'Norm', 'Relu',
+            'Conv', 'Norm', 'Relu',
+            'ConvSum', 'Norm', 'Relu',
             'SoftmaxLoss'
         ], params_ = [(1, 15, 15),
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
@@ -28,7 +28,7 @@ class DeepConvNet:
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
         ], dropout_ration=0.5, pooling_params={"pool_h": 2, "pool_w": 2, "stride": 2}, 
-           weight_decay_lambda=0, mini_batch_size=100, saved_network_pkl=None, not0_size=4):
+           weight_decay_lambda=1e-7, mini_batch_size=100, saved_network_pkl=None, not0_size=4):
         
         layers_info = [layer.lower() for layer in layers_info]
         self.network_infos = {} # pkl파일에 저장할 신경망 정보
@@ -337,7 +337,7 @@ class DeepConvNet:
 
         return grads
 
-    def save_params(self, trainer, str_data_info, save_inside_dir=True, pkl_dir="saved_pkls"):
+    def save_params(self, optimizer, lr, test_accs=[], str_data_info="", save_inside_dir=True, pkl_dir="saved_pkls"):
         
         self.network_infos["layers_info"]         = self.layers_info
         self.network_infos["params_"]             = self.params_
@@ -351,7 +351,7 @@ class DeepConvNet:
         # self.network_infos["layers"] = self.layers # pkl파일 용량이 너무 커짐 (이미 layers_info가 있으니 똑같이 다신 만들 수 있음)
         # self.network_infos["layer_idxs_used_params"] = self.layer_idxs_used_params  ### 새로운 레이어들이 또 append됨
         # print(self.saved_network_pkl)
-        if len(trainer.test_accs) == 0:
+        if len(test_accs) == 0:
             if self.saved_network_pkl == None:
                 acc = "None"
             else: ### self. 빼먹음
@@ -360,7 +360,7 @@ class DeepConvNet:
             acc = math.floor(trainer.test_accs[-1]*100)/100
         
         file_name = f"{str_data_info} acc_{acc} ln_{self.learning_num} " + \
-            f"{trainer.optimizer.__class__.__name__} lr_{trainer.optimizer.lr} {self.network_dir} params.pkl"
+            f"{optimizer.__class__.__name__} lr_{lr} {self.network_dir} params.pkl"
         file_path = file_name
         
         if save_inside_dir: ### if save_inside_dir: 안에 선언이 있으면 선언되지 않을 수 있음
@@ -422,7 +422,7 @@ class DeepConvNet:
 
         params = network_infos["params"]
         for key, val in params.items():
-            self.params[key] = val
+            self.loaded_params[key] = val
         # self.loaded_params = network_infos["params"] ### 복사가 아닌 저장된 위치를 가리킴
         # self.layers = network_infos["layers"] # pkl파일 용량이 너무 커짐
         # self.layer_idxs_used_params = network_infos["layer_idxs_used_params"] ### 새로운 레이어들이 또 append됨
@@ -457,25 +457,36 @@ class DeepConvNet:
 
         return True
 
-    def think_win_xy(self, board):
+    def think_win_xy(self, board, whose_turn, verbose=True):
         scores = self.predict(board.reshape(1, 1, 15, 15))
         x, y = scores.argmax()%15, scores.argmax()//15
         
-        scores_nomalized = ( (scores - np.min(scores)) / scores.ptp() * 100).reshape(15, 15)
+        scores_nomalized = ( (scores - np.min(scores)) / (scores.ptp() + 1e-7) * 100).reshape(15, 15)
         winning_odds = (softmax(scores) * 100).reshape(15, 15)
         
-        print("\n=== 점수(scores) ===")
-        np.set_printoptions(linewidth=np.inf, formatter={'all':lambda x: ( # 세자리 출력(100) 방지
-        bcolors.according_to_score(x) + str(int(np.minimum(x, 99))).rjust(2) + bcolors.ENDC)})
-        print(scores_nomalized)
-        print("\n=== 각 자리의 확률 분배(%) ===")
-        np.set_printoptions(linewidth=np.inf, formatter={'all':lambda x: (
-        bcolors.according_to_chance(x) + str(int(np.minimum(x, 99))).rjust(2) + bcolors.ENDC)})
-        print(winning_odds)
-        print(f"\n=== Question ===")
-        print_board(board, mode="Q")
+        print("\n"+"="*40)
+        if verbose:
+            print("\n=== 점수(scores) ===")
+            np.set_printoptions(linewidth=np.inf, formatter={'all':lambda _x: ( # 세자리 출력(100) 방지
+            bcolors.according_to_score(_x) + str(int(np.minimum(_x, 99))).rjust(2) + bcolors.ENDC)})
+            print(scores_nomalized)
+            print("\n=== 각 자리의 확률 분배(%) ===")
+            np.set_printoptions(linewidth=np.inf, formatter={'all':lambda _x: (
+            bcolors.according_to_chance(_x) + str(int(np.minimum(_x, 99))).rjust(2) + bcolors.ENDC)})
+            print(winning_odds)
+            np.set_printoptions()
+            
         print("\n=== AI's Answer ===")
         print_board(board, winning_odds, mode="QnAI")
-        print(f"구한 좌표: x={str(x).rjust(2)}, y={str(y).rjust(2)} ({ math.floor(winning_odds[y, x]*100)/100 }%)")
-
+        
+        is_foul = True
+        while is_foul:
+            foul = isFoul(x, y, board, whose_turn)
+            chance = "%.2f"% (math.floor(winning_odds[y, x]*100)/100) ### % ()
+            print(f"구한 좌표: x={str(x).rjust(2)}, y={str(y).rjust(2)} ({chance}%) foul: {foul}")
+            if foul == "No":
+                is_foul = False
+            else:
+                scores_nomalized[y, x] = -1
+                x, y = scores_nomalized.argmax()%15, scores_nomalized.argmax()//15
         return x, y

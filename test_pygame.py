@@ -10,8 +10,13 @@ from pygame_src.foul_detection import isFive, num_Four, num_Three
 
 # AI Deep Learning network
 from network import DeepConvNet
+from modules.common.optimizer import *
+from modules.make_datas import _change_one_hot_label
+import time # 트레이닝 돌 두는 시간 텀
 
-network = DeepConvNet(saved_network_pkl="4to5, 3to4 (2) acc_99.97 ln_48000 Adam2 lr_0.01 CR_CR_CR_CsumR_Smloss params")
+network = DeepConvNet() # saved_network_pkl="4to5, 3to4 (2) acc_99.97 ln_48000 Adam2 lr_0.01 CR_CR_CR_CsumR_Smloss params"
+lr=0.01
+optimizer = Adam(lr=lr)
 
 ################################################################ pygame code
 
@@ -86,6 +91,7 @@ foul_lose = myfont2.render('그렇게 두고 싶으면 그냥 둬', True, (255, 
 
 myfont3 = pygame.font.Font(font, 40)
 AI_vs_AI_mode = myfont3.render('AI vs AI 모드', True, (255, 0, 0))
+AI_is_training_text = myfont3.render('학습 중...', True, (255, 0, 0))
 
 def make_board(board): # 바둑알 표시하기
     for a in range(size):
@@ -103,6 +109,8 @@ def last_stone(xy): # 마지막 돌 위치 표시하기
 print("\n--Python 오목! (렌주룰)--")
 
 exit=False # 프로그램 종료
+training_mode = False
+game_trial = 0
 
 while not exit:
     pygame.display.set_caption("오목이 좋아, 볼록이 좋아? 오목!")
@@ -121,6 +129,11 @@ while not exit:
     game_over = False # 게임이 끝났나?
     game_review = False # 수순 다시보기 모드인가?
 
+    x_batch = np.empty((0, 1, 15, 15), dtype=np.float16)
+    t_batch = np.empty((0, 1), dtype=int)
+    waiting_time = 0
+    waiting_game_end = False
+
     record = [] # 기보 기록할 곳
 
     black_foul = False # 금수를 뒀나?
@@ -136,14 +149,16 @@ while not exit:
     y_win=375-19 ## 18.75 -> 19 # 커서 실제 위치
     x_win=625-18-250
 
-    board = np.zeros([size, size]) # 컴퓨터가 이용할 바둑판
-    screen.blit(board_img,(window_num, 0)) # 바둑판 이미지 추가
-    screen.blit(play_button,(125, 100))
-    screen.blit(selected_button2,(125, 400))
-    pygame.display.update()
+    board = np.zeros([size, size], dtype=np.float16)
+    
+    if not training_mode:
+        screen.blit(board_img,(window_num, 0)) # 바둑판 이미지 추가
+        screen.blit(play_button,(125, 100))
+        screen.blit(selected_button2,(125, 400))
+        pygame.display.update()
     
     print("\n게임 모드 선택")
-    while not game_selected:
+    while not game_selected and not training_mode:
         for event in pygame.event.get():
 
             if event.type == pygame.QUIT:
@@ -172,12 +187,18 @@ while not exit:
                         pygame.display.set_caption("나랑 같이...오목 할래?")
                     pygame.mixer.Sound.play(sound1)
                     game_selected = True
-                
+
+                elif event.key == pygame.K_t:
+                    if not training_mode:
+                        training_mode = True
+                    else:
+                        training_mode = False
+
                 elif event.key == pygame.K_ESCAPE:
                     exit=True
                     game_selected = True
                     game_end=True
-                    
+
                 if not game_selected:
                     if game_mode=="Human_vs_AI":
                         screen.blit(play_button,(125, 100))
@@ -190,7 +211,7 @@ while not exit:
                     screen.blit(select,(x_win,y_win))
                 pygame.display.update()
 
-    pygame.mixer.music.play(-1) # -1 : 반복 재생
+    pygame.mixer.music.play(-1) if not training_mode else {} # -1 : 반복 재생
     print("\n게임 시작!")
     # print(difference_score_board(whose_turn, size, board), "\n") #print
     while not game_end:
@@ -272,7 +293,7 @@ while not exit:
                         game_mode = "AI_vs_AI"
                     else:
                         game_mode = game_mode_origin
-                elif event.key == pygame.K_F9: # AI vs AI mode on/off
+                elif event.key == pygame.K_F9: # AI mode Human_Made_Algorithms / Deep_Learning
                     if AI_mode != "Human_Made_Algorithms":
                         AI_mode = "Human_Made_Algorithms"
                     else:
@@ -287,7 +308,7 @@ while not exit:
                         game_over=False
                 elif event.key == pygame.K_SPACE and game_over: # 금수 연타했을 때 패배 창 제대로 못 보는거 방지
                     continue
-                elif event.key == pygame.K_SPACE and not game_over: # 돌 두기
+                elif event.key == pygame.K_SPACE and not training_mode and not game_over: # 돌 두기
 
                     # 플레이어가 두기
                     if game_mode=="Human_vs_Human" or (game_mode=="Human_vs_AI" and whose_turn == -1):
@@ -305,7 +326,7 @@ while not exit:
                             board[y][x] = -1
                         
                         # 오목 생겼나 확인
-                        five = isFive(whose_turn, size, board, x, y, placed=True)
+                        five = isFive(whose_turn, board, x, y, placed=True)
                         
                         # 오목이 생겼으면 게임 종료 신호 키기, 아니면 무르기
                         if five == True:
@@ -326,13 +347,13 @@ while not exit:
                                 screen.blit(six_text,(235, 660))
                                 if before_foul:
                                     foul_n_mok += 1
-                            elif stubborn_foul or num_Four(whose_turn, size, board, x, y, placed=True) >= 2:
+                            elif stubborn_foul or num_Four(whose_turn, board, x, y, placed=True) >= 2:
                                 print("흑은 사사에 둘 수 없음")
                                 black_foul = True
                                 screen.blit(fourfour_text,(235, 660))
                                 if before_foul:
                                     foul_n_mok += 1
-                            elif stubborn_foul or num_Three(whose_turn, size, board, x, y, placed=True) >= 2:
+                            elif stubborn_foul or num_Three(whose_turn, board, x, y, placed=True) >= 2:
                                 print("흑은 삼삼에 둘 수 없음")
                                 black_foul = True
                                 screen.blit(threethree_text,(235, 660))
@@ -416,7 +437,7 @@ while not exit:
                         y_win = 27 + dis*y
 
                         # 오목이 생겼으면 게임 종료 신호 키기
-                        if isFive(whose_turn, size, board, x, y, placed=True) == True:
+                        if isFive(whose_turn, board, x, y, placed=True) == True:
                             pygame.display.set_caption("나에게 복종하라 인간.")
                             game_over=True
 
@@ -437,6 +458,12 @@ while not exit:
                             if not black_foul:
                                 print("백 승리!")
                         # print(difference_score_board(whose_turn, size, board), "\n") #print
+
+                elif event.key == pygame.K_t:
+                    if not training_mode:
+                        training_mode = True
+                    else:
+                        training_mode = False
 
                 # 바둑알, 커서 위치 표시, 마지막 돌 표시, AI vs AI 모드 화면에 추가
                 if not exit:
@@ -467,6 +494,99 @@ while not exit:
 
                 # 화면 업데이트
                 pygame.display.update()
+
+        # 트레이닝 모드일 때
+        if training_mode:
+            waiting_time = time.time()
+
+            # AI가 두기
+            if not game_over:
                 
+                # 사람이 생각한 알고리즘
+                x1, y1 = AI_think_win_xy(whose_turn, board, verbose=False)
+                if whose_turn != 1: 
+                    x, y = x1, y1
+                else: # 딥러닝 신경망 AI
+                    x2, y2 = network.think_win_xy(board, whose_turn, verbose=False)
+                    x, y = x2, y2
+                
+                # 보드 상태와 내 AI답 저장 (학습할 문제와 답 저장)
+                x_batch = np.append(x_batch, board.reshape(1, 1, 15, 15), axis=0)
+                t_batch = np.append(t_batch, np.array([[y1*15+x1]], dtype=int), axis=0)
+                
+                # 선택한 좌표에 돌 두기
+                board[y][x] = whose_turn
+                
+                record.append([y, x, whose_turn])
+                last_stone_xy = [y, x]
+                turn += 1
+            
+                x_win = 28 + dis*x # 커서 이동
+                y_win = 27 + dis*y
+            
+                # 오목이 생겼으면 게임 종료 신호 키기
+                if isFive(whose_turn, board, x, y, placed=True) == True:
+                    pygame.display.set_caption("나에게 복종하라 로봇.")
+                    game_over=True
+                
+                # 승부가 결정나지 않았으면 턴 교체, 바둑판이 가득 차면 초기화
+                if not game_over:
+                    # time.sleep(0.08) ## 바둑돌 소리 겹치지 않게 -> AI계산 시간이 길어지면서 필요없어짐
+                    # pygame.mixer.Sound.play(sound2)
+                    whose_turn *= -1
+            
+                    if turn < max_turn: 
+                        last_stone_xy = [y, x] # 마지막 놓은 자리 표시
+                    else:
+                        turn = 0
+                        board = np.zeros([size, size])
+                else:
+                    print("백 승리!")
+                # print(difference_score_board(whose_turn, size, board), "\n") #print
+            
+            # 바둑알, 커서 위치 표시, 마지막 돌 표시, 학습 모드 화면에 표시
+            if not exit:
+                make_board(board)
+                screen.blit(select,(x_win,y_win))
+                screen.blit(AI_is_training_text,(600, 705))
+                if turn != 0: # or event.key == pygame.K_F2 or event.key == pygame.K_F3
+                    last_stone([last_stone_xy[1], last_stone_xy[0]])
+            
+            # 흑,백 승리 이미지 화면에 추가, 학습하기, 기보 저장
+            if game_over:
+                if waiting_game_end == False:
+
+                    waiting_game_end = True
+                    waiting_time_game_end = time.time()
+
+                    grads = network.gradient(x_batch, _change_one_hot_label(t_batch))
+                    optimizer.update(network.params, grads)
+                    network.learning_num += x_batch.shape[0]
+                    print("경기 학습 완료")
+
+                    game_trial += 1
+                    if game_trial == 10:
+                        game_trial = 0
+                        network.save_params(optimizer, lr, str_data_info="training with myAI")
+
+                    # 기보 파일로 저장
+                    with open('etc/GiBo_Training.txt', 'a', encoding='utf8') as file:
+                        file.write(datetime.today().strftime("%Y/%m/%d %H:%M:%S") + "\n") # YYYY/mm/dd HH:MM:SS 형태로 출력
+                        for i in range(len(record)):
+                            turn_hangul = "흑" if record[i][2] == 1 else "백"
+                            file.write(str(record[i][0]+1)+' '+str(record[i][1]+1)+' '+turn_hangul+'\n')
+                        file.write("\n")
+
+                if whose_turn == 1 and not black_foul: # 흑 승리/백 승리 표시
+                    screen.blit(win_black,(0,250))
+                else:
+                    screen.blit(win_white,(0,250))
+
+                if waiting_game_end and time.time()-waiting_time_game_end > 2:
+                    game_end = True
+
+            # 화면 업데이트
+            pygame.display.update()
+            
 print("\nGood Bye")
 pygame.quit()

@@ -206,3 +206,10 @@ logger = __get_logger()
 
 # 원하는 위치에 로그 메시지 작성 - info level로 아래의 메시지를 출력하겠다.
 logger.info("안녕")
+
+line("할당과 복사")
+
+a = np.array([1, 2])
+b = a.copy()
+a[0] = 3
+print(a, b)
