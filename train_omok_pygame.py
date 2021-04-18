@@ -14,9 +14,11 @@ from modules.common.optimizer import *
 from modules.make_datas import _change_one_hot_label
 import time # 트레이닝 돌 두는 시간 텀
 
-network = DeepConvNet() # saved_network_pkl="4to5, 3to4 (2) acc_99.97 ln_48000 Adam2 lr_0.01 CR_CR_CR_CsumR_Smloss params"
+# network = DeepConvNet(saved_network_pkl="4to5, 3to4 (2) acc_99.97 ln_48000 Adam2 lr_0.01 CR_CR_CR_CsumR_Smloss params") 
+network = DeepConvNet()
 lr=0.01
 optimizer = Adam(lr=lr)
+plot_distribution = True
 
 ################################################################ pygame code
 
@@ -111,6 +113,7 @@ print("\n--Python 오목! (렌주룰)--")
 exit=False # 프로그램 종료
 training_mode = False
 game_trial = 0
+first_trial = True
 
 while not exit:
     pygame.display.set_caption("오목이 좋아, 볼록이 좋아? 오목!")
@@ -138,7 +141,7 @@ while not exit:
 
     black_foul = False # 금수를 뒀나?
     before_foul = False # 한 수 전에 금수를 뒀나?
-    stubborn_foul = False # 방향키를 움직이지 않고 또 금수를 두었나? (금수자리를 연타했나)
+    stubborn_foul = "No" # 방향키를 움직이지 않고 또 금수를 두었나? (그랬을 때 금수 종류) (금수자리를 연타했나)
     foul_n_mok = 0 # 연속 금수 횟수
     threethree_foul = False
     fourfour_foul = False
@@ -211,7 +214,10 @@ while not exit:
                     screen.blit(select,(x_win,y_win))
                 pygame.display.update()
 
-    pygame.mixer.music.play(-1) if not training_mode else {} # -1 : 반복 재생
+    if not training_mode or first_trial:
+        first_trial = False
+        pygame.mixer.music.play(-1) # -1 : 반복 재생
+
     print("\n게임 시작!")
     # print(difference_score_board(whose_turn, size, board), "\n") #print
     while not game_end:
@@ -234,19 +240,19 @@ while not exit:
                         if y_win-dis > 0:
                             y_win -= dis
                             y -= 1
-                    balck_stubborn = False
+                    stubborn_foul = "No"
                 elif event.key == pygame.K_DOWN:
                     if not game_review:
                         if y_win+dis < window_high-dis:
                             y_win += dis
                             y += 1
-                        balck_stubborn = False
+                        stubborn_foul = "No"
                 elif event.key == pygame.K_LEFT:
                     if not game_review:
                         if x_win-dis > window_num:
                             x_win -= dis
                             x -= 1
-                        balck_stubborn = False
+                        stubborn_foul = "No"
                     
                     elif turn > 0:
                         pygame.mixer.Sound.play(sound3)
@@ -258,7 +264,7 @@ while not exit:
                         if x_win+dis < window_high + window_num - dis:
                             x_win += dis
                             x += 1
-                        balck_stubborn = False
+                        stubborn_foul = "No"
                     
                     elif turn < final_turn:
                         pygame.mixer.Sound.play(sound2)
@@ -300,13 +306,18 @@ while not exit:
                         AI_mode = "Deep_Learning"
                 elif event.key == pygame.K_ESCAPE: # 창 닫기
                     exit=True
-                    game_end=True
+                    game_end=True             
+                elif event.key == pygame.K_t: # 트레이닝 모드
+                    if not training_mode:
+                        training_mode = True
+                    else:
+                        training_mode = False
 
                 # Enter, Space 키
                 elif event.key == pygame.K_RETURN and game_over: # 게임 종료
                         game_end=True
                         game_over=False
-                elif event.key == pygame.K_SPACE and game_over: # 금수 연타했을 때 패배 창 제대로 못 보는거 방지
+                elif event.key == pygame.K_SPACE and game_over: # 금수 연타했을 때 패배 창 제대로 못 보고 넘어가기 방지
                     continue
                 elif event.key == pygame.K_SPACE and not training_mode and not game_over: # 돌 두기
 
@@ -341,29 +352,31 @@ while not exit:
                         elif whose_turn == 1:
                             
                             # 장목(6목 이상), 3-3, 4-4 금수인지 확인
-                            if stubborn_foul or five == None: # black_고집 센 : 금수자리를 연타하는 경우 연산 생략
+                            if stubborn_foul=="6목" or five == None: # black_고집 센 : 금수자리를 연타하는 경우 연산 생략
                                 print("흑은 장목을 둘 수 없음")
                                 black_foul = True
+                                stubborn_foul = "6목"
                                 screen.blit(six_text,(235, 660))
                                 if before_foul:
                                     foul_n_mok += 1
-                            elif stubborn_foul or num_Four(whose_turn, board, x, y, placed=True) >= 2:
+                            elif stubborn_foul=="4-4" or num_Four(whose_turn, board, x, y, placed=True) >= 2:
                                 print("흑은 사사에 둘 수 없음")
                                 black_foul = True
+                                stubborn_foul = "4-4"
                                 screen.blit(fourfour_text,(235, 660))
                                 if before_foul:
                                     foul_n_mok += 1
-                            elif stubborn_foul or num_Three(whose_turn, board, x, y, placed=True) >= 2:
+                            elif stubborn_foul=="3-3" or num_Three(whose_turn, board, x, y, placed=True) >= 2:
                                 print("흑은 삼삼에 둘 수 없음")
                                 black_foul = True
+                                stubborn_foul = "3-3"
                                 screen.blit(threethree_text,(235, 660))
                                 if before_foul:
                                        foul_n_mok += 1
                              
                             # 금수를 두면 무르고 다시 (연속 금수 10번까지 봐주기)
-                            if black_foul: 
+                            if black_foul:
                                 if foul_n_mok < 10:
-                                    balck_stubborn = True
                                     pygame.mixer.Sound.play(black_foul_sound)
                                     before_foul = True
                                     black_foul = False
@@ -459,12 +472,6 @@ while not exit:
                                 print("백 승리!")
                         # print(difference_score_board(whose_turn, size, board), "\n") #print
 
-                elif event.key == pygame.K_t:
-                    if not training_mode:
-                        training_mode = True
-                    else:
-                        training_mode = False
-
                 # 바둑알, 커서 위치 표시, 마지막 돌 표시, AI vs AI 모드 화면에 추가
                 if not exit:
                     make_board(board)
@@ -497,7 +504,7 @@ while not exit:
 
         # 트레이닝 모드일 때
         if training_mode:
-            waiting_time = time.time()
+            # waiting_time = time.time()
 
             # AI가 두기
             if not game_over:
@@ -559,7 +566,7 @@ while not exit:
                     waiting_game_end = True
                     waiting_time_game_end = time.time()
 
-                    grads = network.gradient(x_batch, _change_one_hot_label(t_batch))
+                    grads = network.gradient(x_batch, _change_one_hot_label(t_batch), plot_distribution=plot_distribution)
                     optimizer.update(network.params, grads)
                     network.learning_num += x_batch.shape[0]
                     print("경기 학습 완료")

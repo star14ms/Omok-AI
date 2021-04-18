@@ -10,6 +10,7 @@ from modules.test import print_board
 import math
 from modules.common.util import bcolors, __get_logger
 from pygame_src.foul_detection import isFoul
+import matplotlib.pyplot as plt
 
 logger = __get_logger()
 
@@ -28,7 +29,7 @@ class DeepConvNet:
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
             {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
         ], dropout_ration=0.5, pooling_params={"pool_h": 2, "pool_w": 2, "stride": 2}, 
-           weight_decay_lambda=1e-7, mini_batch_size=100, saved_network_pkl=None, not0_size=4):
+           weight_decay_lambda=0, mini_batch_size=100, saved_network_pkl=None, not0_size=4):
         
         layers_info = [layer.lower() for layer in layers_info]
         self.network_infos = {} # pkl파일에 저장할 신경망 정보
@@ -225,17 +226,25 @@ class DeepConvNet:
                 self.layers[layer_idx].W = self.params['W' + str(i+1)]
                 self.layers[layer_idx].b = self.params['b' + str(i+1)]
 
-    def predict(self, x, train_flg=False):
+    def predict(self, x, train_flg=False, plot_distribution=False):
+        i = 0
+        activations = {}
         for layer in self.layers:
             # print(layer)
-            if isinstance(layer, Dropout) or isinstance(layer, BatchNormalization):
+            if type(layer) in (Dropout, BatchNormalization):
                 x = layer.forward(x, train_flg)
             else:
                 x = layer.forward(x)
+            
+            if plot_distribution and type(layer) in (Relu, Sigmoid): # Tanh
+                activations[i] = x
+                i += 1
+
+        self.plot_active_value_distribution(activations) if plot_distribution else ()
         return x
 
-    def loss(self, x, t):
-        y = self.predict(x, train_flg=True)
+    def loss(self, x, t, plot_distribution=False):
+        y = self.predict(x, train_flg=True, plot_distribution=plot_distribution)
         
         weight_decay = 0
         for i, _ in enumerate(self.layer_idxs_used_params):
@@ -311,9 +320,9 @@ class DeepConvNet:
         else:
             return acc / x.shape[0] * (100 if percentage else 1)
 
-    def gradient(self, x, t):
+    def gradient(self, x, t, plot_distribution=False):
         # forward
-        self.loss(x, t)
+        self.loss(x, t, plot_distribution=plot_distribution)
 
         # backward
         dout = 1
@@ -490,3 +499,16 @@ class DeepConvNet:
                 scores_nomalized[y, x] = -1
                 x, y = scores_nomalized.argmax()%15, scores_nomalized.argmax()//15
         return x, y
+
+    def plot_active_value_distribution(self, activations):
+        plt.figure(figsize=(3*len(activations),5))
+        plt.subplots_adjust(left=0.05, right=0.98, wspace=0.3)
+        
+        for i, a in activations.items():
+            plt.subplot(1, len(activations), i+1)
+            plt.title(str(i+1) + "-activation")
+            # if i != 0: plt.yticks([], [])
+            plt.xlim(0, 1)
+            plt.hist(a.flatten(), 30, range=(0,1))
+            
+        plt.show()

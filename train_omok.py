@@ -18,7 +18,7 @@ saved_graphdata_pkl = None
 # ================================ < 주석을 풀면 학습 실행
 # train_network = True
 # ================================ v 주석을 풀면 신경망 불러오기
-# saved_network_pkl = "Momentum0 lr_0.01 ln_28600 acc_99.93 CR_CR_CR_CsumR_Smloss params"
+# saved_network_pkl = "4to5 (1) acc_99.93 ln_28600 Momentum1 lr_0.01 CR_CR_CR_CsumR_Smloss params"
 # saved_network_pkl = "4to5 Adam1 lr_0.01 ln_28600 acc_100.0 CR_CR_CR_CsumR_Smloss params"
 # saved_network_pkl = "4to5, 3to4 (2) acc_99.97 ln_48000 Adam2 lr_0.01 CR_CR_CR_CsumR_Smloss params"
 
@@ -69,7 +69,7 @@ if train_network:
 # 정확도 구하고, 맞은 or 틀린 문제 확인, 테스트
 # accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True, verbose=True) # , multiple_answers=True
 # test.right_or_wrong_answers(network, x_datas, t_datas, wrong_idxs)
-test.random_picks(network, x_datas, t_datas) # 4to5 (0, 825), (825, 1650), (1650, 2255), (2255, 2860)
+# test.random_picks(network, x_datas, t_datas) # 4to5 (0, 825), (825, 1650), (1650, 2255), (2255, 2860)
 # test.pick(network, x_datas, t_datas, 0)
 
 # # 합성곱 필터 시각화하기
@@ -95,10 +95,10 @@ test.random_picks(network, x_datas, t_datas) # 4to5 (0, 825), (825, 1650), (1650
 # from modules.common.functions import softmax, cross_entropy_error
 # from modules.common.layers import Not0SamplingLoss
 # import random
-# idx, num = 0, 2
+# idx, num = 0, 2000
 # x, t = x_datas[idx:idx+num], t_datas[idx:idx+num]
 
-# y0 = network.predict(x)
+# y0 = network.predict(x, plot_activations=True)
 # # y = softmax(y0)
 # # loss = cross_entropy_error(y, t)
 
