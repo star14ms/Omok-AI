@@ -127,7 +127,9 @@ class SoftmaxWithLoss:
             dx = self.y.copy(self.t)
             dx[np.arange(batch_size), self.t] -= 1
             dx = dx / batch_size
-        
+        # print("\n역전파 기울기:")
+        # print((dx[0]*10000).reshape(15, 15).astype(int))
+        # time.sleep(8)
         return dx
 
 
@@ -203,7 +205,8 @@ class BatchNormalization:
         else:
             xc = x - self.running_mean
             xn = xc / ((np.sqrt(self.running_var + 10e-7)))
-            
+        # print(self.input_shape)
+        # print(self.gamma.shape, xn.shape, self.beta.shape)
         out = self.gamma * xn + self.beta 
         return out
 
@@ -354,6 +357,7 @@ class SigmoidWithLoss:
         batch_size = self.t.shape[0]
 
         dx = (self.y - self.t) * dout / batch_size
+        # print(self.y.shape, self.t.shape, dx.shape)
         return dx
 
 
@@ -503,56 +507,133 @@ class NegativeSamplingLoss:
         return dh
 
 
-class NotZeroSamplingLoss: ## num0를 푸는 문제마다 달라지게 할 수 있을까?
-    def __init__(self, W, num0):
-        self.num0 = num0
-        self.loss_layers = [SigmoidWithLoss() for _ in range(self.num0 + 1)]
-        self.embed_dot_layers = [EmbeddingDot(W) for _ in range(self.num0 + 1)]
+# class NotZeroSamplingLoss: # embedingdot 계층 유지하기 (미완성)
+    # def __init__(self, W, not0_num):
+    #     self.not0_num = not0_num
+    #     self.loss_layers = [SigmoidWithLoss() for _ in range(self.not0_num + 1)]
+    #     self.embed_dot_layers = [EmbeddingDot(W) for _ in range(self.not0_num + 1)]
 
-        self.params, self.grads = [], []
-        for layer in self.embed_dot_layers:
-            self.params += layer.params
-            self.grads += layer.grads
+    #     self.params, self.grads = [], []
+    #     for layer in self.embed_dot_layers:
+    #         self.params += layer.params
+    #         self.grads += layer.grads
          
+    # def get_not0_samples(self, x_board):
+    #     batch_size = x_board.shape[0]
+    #     if x_board.ndim == 4:
+    #         x_board = x_board.reshape(-1, 225) # .transpose(1, 0)
+
+    #     not0_idxs = np.zeros([batch_size, self.not0_num], dtype=int)
+    #     not0_idxs_untidy = np.argwhere(x_board != 0)
+
+    #     for i in range(batch_size):
+    #         not0_idxs[i, :] = not0_idxs_untidy[self.not0_num*i : self.not0_num*i+self.not0_num, 1] # not0_idxs[:][1] X
+    #     # print(not0_idxs)
+    #     # print("="*32)
+    #     return not0_idxs
+
+    # def forward(self, scores, x_board):
+    #     batch_size = x_board.shape[0]
+    #     negative_sample = self.get_not0_samples(x_board)
+
+    #     # 정례의 forward
+    #     score = self.embed_dot_layers[0].forward(scores, scores.argmax(axis=1))
+    #     correct_label = np.ones(batch_size, dtype=np.int32)
+    #     loss = self.loss_layers[0].forward(score, correct_label)
+    #     print(scores.argmax(axis=1)) # scores.astype(np.int32).reshape(2, 15, 15), 
+
+    #     # 부례의 forward
+    #     negative_label = np.zeros(batch_size, dtype=np.int32)
+    #     for i in range(self.not0_num):
+    #         negative_target = negative_sample[:, i]
+    #         score = self.embed_dot_layers[1 + i].forward(scores, negative_target)
+    #         loss += self.loss_layers[1 + i].forward(score, negative_label)
+    #         print(negative_target) # scores.astype(np.int32).reshape(2, 15, 15), 
+
+    #     return loss
+
+    # def backward(self, dout=1):
+    #     dh = 0
+    #     for l0, l1 in zip(self.loss_layers, self.embed_dot_layers):
+    #         dscore = l0.backward(dout)
+    #         dh += l1.backward(dscore)
+
+    #     return dh
+    
+# from modules.test import print_board
+import time
+
+class Not0SamplingLoss: # 정답 오답 인덱스에만 기울기 전하기 ## num0를 푸는 문제마다 달라지게 할 수 있을까?
+    def __init__(self, not0_num):
+        self.not0_num = not0_num
+        self.loss_layers = [SigmoidWithLoss() for _ in range(self.not0_num + 1)]
+        self.scores_shape = None
+        self.all_targets = []
+
     def get_not0_samples(self, x_board):
-        batch_size = x_board.shape[0]
+        # print_board(x_board[0], mode="Q")
         if x_board.ndim == 4:
-            x_board = x_board.reshape(-1, 225) # .transpose(1, 0)
+            x_board = x_board.reshape(-1, 225)
 
-        not0_idxs = np.zeros([batch_size, self.num0], dtype=int)
         not0_idxs_untidy = np.argwhere(x_board != 0)
+        # print(not0_idxs_untidy.shape)
 
-        for i in range(batch_size):
-            not0_idxs[i, :] = not0_idxs_untidy[self.num0*i : self.num0*i+self.num0, 1] # not0_idxs[:][1] X
-        # print(not0_idxs)
-        # print("="*32)
+        for i in range(self.batch_size):
+            while (i*self.not0_num+self.not0_num < len(not0_idxs_untidy)) and (
+                not0_idxs_untidy[i*self.not0_num][0] == not0_idxs_untidy[i*self.not0_num+self.not0_num][0]):
+                not0_idxs_untidy = np.delete(not0_idxs_untidy, i*self.not0_num+self.not0_num, 0)
+        # print(not0_idxs_untidy.shape)
+
+        not0_idxs = np.zeros([self.batch_size, self.not0_num], dtype=int)
+        for i in range(self.batch_size):
+            not0_idxs[i, :] = not0_idxs_untidy[self.not0_num*i : self.not0_num*i+self.not0_num, 1] # not0_idxs[:][1] X
+        # print(not0_idxs.shape)
+
         return not0_idxs
 
-    def forward(self, scores, x_board):
-        batch_size = x_board.shape[0]
-        negative_sample = self.get_not0_samples(x_board)
+    def forward(self, scores, t, x_board):
+        self.scores_shape = scores.shape
+        self.batch_size = x_board.shape[0]
+
+        n_targets = self.get_not0_samples(x_board)
+        p_target = t.argmax(axis=1).reshape(self.batch_size, 1)
+        self.all_targets = np.concatenate((p_target, n_targets), axis=1) ### 배열 합치기 axis=(수가 바뀌는 차원)
+
+        # print_board(x_board[0], mode="Q")
+        # print("\n순전파 입력:", self.scores_shape)
+        # print("\n오답 샘플:", n_targets.shape)
+        # print("정답 샘플:", p_target.shape)
+        # print("전체 샘플:", self.all_targets.shape)
 
         # 정례의 forward
-        score = self.embed_dot_layers[0].forward(scores, scores.argmax(axis=1))
-        correct_label = np.ones(batch_size, dtype=np.int32)
+        correct_label = np.ones(self.batch_size, dtype=np.int32)
+        score = scores[[range(self.batch_size)], p_target][0]
         loss = self.loss_layers[0].forward(score, correct_label)
-        print(scores.argmax(axis=1)) # scores.astype(np.int32).reshape(2, 15, 15), 
+
+        # print("idx {0}, {1} 점수: {2}".format( p_target[0][0], correct_label[0], score[0].round(6) ))
 
         # 부례의 forward
-        negative_label = np.zeros(batch_size, dtype=np.int32)
-        for i in range(self.num0):
-            negative_target = negative_sample[:, i]
-            score = self.embed_dot_layers[1 + i].forward(scores, negative_target)
+        negative_label = np.zeros(self.batch_size, dtype=np.int32)
+        for i in range(self.not0_num):
+            n_target = n_targets[:, i]
+            score = scores[[range(self.batch_size)], n_target][0]
             loss += self.loss_layers[1 + i].forward(score, negative_label)
-            print(negative_target) # scores.astype(np.int32).reshape(2, 15, 15), 
+
+            # print("idx {0}, {1} 점수: {2}".format( n_target[0], negative_label[0], score[0].round(6) ))
 
         return loss
 
     def backward(self, dout=1):
-        dh = 0
-        for l0, l1 in zip(self.loss_layers, self.embed_dot_layers):
-            dscore = l0.backward(dout)
-            dh += l1.backward(dscore)
+        dh = np.zeros(self.scores_shape) ### zeros_like에는 배열이 직접 들어가야 한다 (배열의 shape가 아닌)
+        
+        for idx, loss_layer in enumerate(self.loss_layers):
+            dscore = loss_layer.backward(dout)
+            np.add.at(dh, ( range(self.batch_size), self.all_targets[:,idx] ), dscore)
+            # print("dh:{0} not0_idxs_y{1} dscore{2}".format(dh.shape, self.all_targets.shape, dscore.shape))
+            # print((dscore[0]*10000).astype(int))
+            # time.sleep(1)
 
+        # print("\n역전파 기울기:")
+        # print((dh[0]*10000).reshape(15, 15).astype(int))
+        # time.sleep(8)
         return dh
-    

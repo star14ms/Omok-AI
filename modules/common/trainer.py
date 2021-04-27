@@ -34,7 +34,7 @@ class Trainer:
         self.optimizer = optimizer_class_dict[optimizer.lower()](**optimizer_param)
         
         self.train_size = x_train.shape[0]
-        self.iter_per_epoch = max(self.train_size / mini_batch_size, 1)
+        self.iter_per_epoch = max(int(self.train_size / mini_batch_size), 1)
         self.max_iter = int(epochs * self.iter_per_epoch)
         self.current_iter = 0
         self.current_epoch = 0
@@ -86,12 +86,12 @@ class Trainer:
 
                 if self.verbose_epoch: 
                     print("=== epoch:" + str(self.current_epoch) + ", train acc:" + str(
-                        math.floor(train_acc*100*100)/100) + "%, test acc:" + str(
-                        math.floor(test_acc*100*100)/100) + "% ===")
+                        math.floor(train_acc*100)/100) + "%, test acc:" + str(
+                        math.floor(test_acc*100)/100) + "% ===")
                     # print("=== " + str(self.current_epoch) + " / train:" + format(loss, ".10f") + ", test:" + format(test_loss, ".10f") + " (loss) ===")
                     # print("=== epoch: " + str(self.current_epoch) + "train_loss: " + str(round(loss, 3)) + " ===")
                 
-                if self.current_epoch == self.give_up['epoch']:
+                if self.give_up['epoch'] == self.current_epoch:
                     if 'test_loss' in self.give_up and (np.isnan(loss) or loss > self.give_up['test_loss']):
                         if self.verbose: print(f"I give up! (loss:{self.loss})")
                         self.isgiveup = True
@@ -116,25 +116,26 @@ class Trainer:
         
         if self.verbose_epoch:
             print("=============== Final Test Accuracy ===============")
-            print("train acc: " + str(round(train_acc*100, 2)) + "%", end=", ")
-            print("test acc: " + str(round(test_acc*100, 2)) + "%")
+            print("train acc: " + str(round(train_acc, 2)) + "%", end=", ")
+            print("test acc: " + str(round(test_acc, 2)) + "%")
 
 
-    def save_graph_datas(self, network, save_inside_dir=True, pkl_dir="saved_pkls/graph"):
+    def save_graph_datas(self, network, str_data_info, save_inside_dir=True, pkl_dir="saved_pkls"):
         
         if len(self.test_accs) == 0:
-            acc = network.saved_network_pkl.split(" ")[-2].lstrip("acc=")
+            acc = network.saved_network_pkl.split(" ")[-3].lstrip("acc_")
         else:
-            acc = math.floor(self.test_accs[-1]*100*100)/100
-        file_name = f"{network.network_name} {self.optimizer.__class__.__name__} lr={self.optimizer.lr} ln={network.learning_num} acc={acc} graphdata.pkl"
+            acc = math.floor(self.test_accs[-1]*100)/100
+        file_name = f"{str_data_info} acc_{acc} ln_{network.learning_num} " + \
+            f"{self.optimizer.__class__.__name__} lr_{self.optimizer.lr} {network.network_dir} learninginfo.pkl"
         file_path = file_name
 
         if save_inside_dir:
-            file_path = f"{pkl_dir}/{network.network_name}/" + file_path
+            file_path = f"{pkl_dir}/{network.network_dir}/" + file_path
     
-        if not os.path.exists(f"{pkl_dir}/{network.network_name}"):
-            os.makedirs(f"{pkl_dir}/{network.network_name}")
-            print(f"{pkl_dir}/{network.network_name} 폴더 생성")
+        if not os.path.exists(f"{pkl_dir}/{network.network_dir}"):
+            os.makedirs(f"{pkl_dir}/{network.network_dir}")
+            print(f"{pkl_dir}/{network.network_dir} 폴더 생성")
     
         with open(file_path, 'wb') as f:
             pickle.dump(self.graph_datas, f)
@@ -142,25 +143,28 @@ class Trainer:
         print(f"\n그래프 데이터 저장 성공!\n({file_name})")
 
 
-def load_graph_datas(file_name="graphdata.pkl", pkl_dir="saved_pkls/graph"): ### class 밖에선 self 지워야 함
+def load_graph_datas(file_name="graphdata.pkl", pkl_dir="saved_pkls"): ### class 밖에선 self 지워야 함
 
     if (".pkl" not in file_name) or (file_name[-4:] != ".pkl"):
         file_name = f"{file_name}.pkl"
     file_path = file_name
 
-    network_name = file_path.split(" ")[0]
-    file_path = f"{network_name}/{file_path}"
+    # network_dir = file_path.split(" [")[0].split(" ")[-1] + " [" + file_path.split(" [")[1].rstrip(" params.pkl")
+    network_dir = file_path.split(" ")[-2] # " " -> "_" 같이 수정해주어야 함
+    file_path = f"{network_dir}/{file_path}"
 
     if (file_path.split("/")[:-1] != f"{pkl_dir}"):
         file_path = f"{pkl_dir}/{file_path}"
 
-    if not os.path.exists(f"{pkl_dir}/{network_name}"):
-        os.makedirs(f"{pkl_dir}/{network_name}")
-        print(f"Error: {pkl_dir}/{network_name} 폴더가 없어서 생성")
+    if not os.path.exists(f"{pkl_dir}/{network_dir}"):
+        os.makedirs(f"{pkl_dir}/{network_dir}")
+        print(f"Error: {pkl_dir}/{network_dir} 폴더가 없어서 생성")
 
     if not os.path.exists(file_path):
+        print(f"Error: {file_path} 파일이 없음")
         file_path = file_name
         if not os.path.exists(file_path):
+            print(f"Error: {file_path} 파일이 없음")
             file_path = f"{pkl_dir}/{file_name}"
             if not os.path.exists(file_path):
                 print(f"Error: {file_name} 파일이 없음")
