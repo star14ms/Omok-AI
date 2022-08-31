@@ -119,13 +119,18 @@ c, d = dic.values()
 print(c, d)
 print(len(dic))
 
-line("np.array sum, argmax")
+line("np.array sum, argmax, where")
 
 a = np.array([[1, 2, 6], 
               [3, 4, 5]], dtype=int)
 print(a.sum(), sum(a)) # axis=0
 print(a.argmax())
 print((a * 0.5).dtype)
+
+a = [1, -1, 1]
+print(len(np.where(np.array(a)==1)[0]))
+print(sum(np.array(a)==1))
+
 line()
 
 a, b = 1, 2
@@ -285,3 +290,4 @@ print(arrs.shape)
 line("리스트")
 xy_molds = [[7+i, 7+j] for i in range(-2, 3, 1) for j in range(-2, 3, 1)]
 print(xy_molds)
+

@@ -106,24 +106,24 @@ class time:
         h, m, s = (second // 3600), (second//60 - second//3600*60), (second % 60)
         return h, m, s
     
-    def str_hms_delta(start_time, hms=False, rjust=False):
+    def str_hms_delta(start_time, hms=False, rjust=False, join=':'):
         time_delta = t.time() - start_time
         h, m, s = time.sec_to_hms(time_delta)
-        if hms: 
-            m, s = ("0" if m<10 else "") + str(m), ("0" if s<10 else "") + str(s)
-            return str(f"{h}:{m}:{s}")
+        if not hms:
+            return "{1}{0}{2:02d}{0}{3:02d}".format(join, h, m, s)
         elif rjust: 
             m, s = str(m).rjust(2), str(s).rjust(2)
-        return str(f"{h}h {m}m {s}s")
+        
+        return str(f"{h}h{join}{m}m{join}{s}s")
 
-    def str_hms(second, hms=False, rjust=False):
+    def str_hms(second, hms=False, rjust=False, join=':'):
         h, m, s = time.sec_to_hms(second)
-        if hms: 
-            m, s = ("0" if m<10 else "") + str(m), ("0" if s<10 else "") + str(s)
-            return str(f"{h}:{m}:{s}")
+        if not hms:
+            return "{1}{0}{2:02d}{0}{3:02d}".format(join, h, m, s)
         elif rjust: 
             m, s = str(m).rjust(2), str(s).rjust(2)
-        return str(f"{h}h {m}m {s}s")
+        
+        return str(f"{h}h{join}{m}m{join}{s}s")
 
 import datetime as dt
 from selenium import webdriver

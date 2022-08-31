@@ -1,13 +1,14 @@
 import numpy as np # 보드 만들기
 import pygame # 게임 화면 만들기
-import random 
 from datetime import datetime # 기보 날짜 기록
-from modules.common.util import bcolors, rotate_2dim_array, rotate_2dim_array_idx
+from modules.common.util import rotate_2dim_array, rotate_2dim_array_idx
 from modules.test import print_board
+from modules.plot import *
 
 # AI code (Human Made Algorithm)
 from pygame_src.AI_code import *
 from pygame_src.foul_detection import isFive, num_Four, num_Three
+from modules.Yixin import * # Yixin
 
 # AI Deep Learning network
 from network import DeepConvNet
@@ -16,13 +17,30 @@ from modules.make_datas import _change_one_hot_label
 import time as t # 트레이닝 돌 두는 시간 텀
 from modules.common.util import time
 
-network = DeepConvNet(saved_network_pkl="with myAI's all data acc_None ln_75000 Adam lr_0.01 CR_CR_CR_CR_A_Smloss params")
-str_data_info = "with myAI's b all data"
+saved_network_pkl = "with_myAI (x8x26) ln_1023800 acc_None Adam lr_0.01 CR_CR_CR_CR_A_Smloss params"
+
+saved_graphdata_pkl = saved_network_pkl.split('params')[0] + "learning_info" if saved_network_pkl != None else ""
+graph_datas = {'train_losses': []}
+if saved_graphdata_pkl != "":
+    graph_datas = load_graph_datas(saved_graphdata_pkl)
+    if graph_datas != None:
+        plot.loss_graph(graph_datas['train_losses'], smooth=False)
+        plot.loss_graph(graph_datas['train_losses'], smooth=True)
+    # exit()
+
+network = DeepConvNet(saved_network_pkl=saved_network_pkl)
+str_data_info = ' '.join(saved_network_pkl.split(' ')[:2])
 lr=0.01
 optimizer = Adam(lr=lr)
-plot_distribution = True
+
 training_mode = True
+train_with_Yixin = False
 verbose = False
+mute = True
+learning_num_per_save = 10000
+goal_learning_num = 1500000
+
+if training_mode and train_with_Yixin: Yixin.init()
 
 ################################################################ pygame code
 
@@ -118,17 +136,13 @@ def last_stone(xy): # 마지막 돌 위치 표시하기
 print("\n--Python 오목! (렌주룰)--")
 
 exit=False # 프로그램 종료
-mute=False
-
-win_num = 0
-game_trial = 0
-game_trial_per_ln_5000 = 0
-learning_5000_num = network.learning_num // 5000
-str_turns = ""
 first_trial = True
 
-x_datas = np.empty((0, 15, 15), dtype=np.float16)
-t_datas = np.empty((0, 1), dtype=int)
+resent_who_win = []
+save_num = network.learning_num // learning_num_per_save
+str_turns = ""
+train_losses = []
+
 x_datas_left = np.empty((0, 15, 15), dtype=np.float16)
 t_datas_left = np.empty((0, 1), dtype=int)
 start_time = t.time()
@@ -155,6 +169,8 @@ while not exit:
     waiting_game_end = False
 
     record = [] # 기보 기록할 곳
+    x_datas = np.empty((0, 15, 15), dtype=np.float16)
+    t_datas = np.empty((0, 1), dtype=int)
     x_datas_necessary = np.empty((0, 15, 15), dtype=np.float16)
     t_datas_necessary = np.empty((0, 1), dtype=int)
 
@@ -177,6 +193,10 @@ while not exit:
         screen.blit(board_img,(window_num, 0)) # 바둑판 이미지 추가
         screen.blit(play_button,(125, 100))
         screen.blit(selected_button2,(125, 400))
+        pygame.display.update()
+    elif train_with_Yixin:
+        Yixin.reset()
+        screen.blit(board_img,(window_num, 0)) # 바둑판 이미지 추가
         pygame.display.update()
     
     # print("\n게임 모드 선택")
@@ -243,36 +263,56 @@ while not exit:
         screen.blit(board_img,(window_num, 0)) ## screen.fill(0) : 검은 화면
         
         # 트레이닝 모드일 때
-        if training_mode and t.time()-waiting_time > 1: # and t.time()-waiting_time > 0.1
-            waiting_time = t.time()
+        if training_mode: # and t.time()-waiting_time > 0.1
+            # waiting_time = t.time()
 
             # AI가 두기
             if not game_over:
-                
-                # 사람이 생각한 알고리즘 (백)
-                x1, y1, is_necessary = AI_think_win_xy(whose_turn, board, all_molds=True, verbose=True, return_is_necessary=True)
+
+                if turn == 0:
+                    x1, y1 = 7, 7
+                elif train_with_Yixin and turn >= 3: # 알파오 Yixin (백)
+                    x1, y1 = Yixin.think_win_xy(whose_turn, undo=True if whose_turn == 1 else False)
+                    # print(f"{X_line[x1]}{Y_line[y1]} Yixin" if x1!=None else None)
+                if not train_with_Yixin or x1==None or turn < 3: # 사람이 생각한 알고리즘 (백)
+                    x1, y1 = AI_think_win_xy(whose_turn, board, all_molds=True, verbose=False)
+                    # print(f"{X_line[x1]}{Y_line[y1]} myAI")
+                    if train_with_Yixin and turn == 2: Yixin.Click_setting("plays_w")
+                    if train_with_Yixin and whose_turn==-1:
+                        if turn == 1:
+                            Click(x1, y1, board_xy=True)
+                        else:
+                            Yixin.Click_setting("plays_w")
+                            Click(x1, y1, board_xy=True)
+                            Yixin.Click_setting("plays_w")
+        
                 if whose_turn != 1:
                     x, y = x1, y1
+                    if train_with_Yixin and turn >= 3:
+                        Yixin.Click_setting("plays_b")
+                        Yixin.Click_setting("plays_w")
+                        Click(0, 0) # 다음 흑이 둘 수 미리 생각하기 (Yixin)
                 else: # 딥러닝 신경망 AI (흑)
                     x2, y2 = network.think_win_xy(board, whose_turn, verbose=verbose)
                     x, y = x2, y2
-
+                    if train_with_Yixin: Click(x2, y2, board_xy=True)
+    
                     x_datas = np.append(x_datas, board.reshape(1, 15, 15), axis=0)
                     t_datas = np.append(t_datas, np.array([[y1*15+x1]], dtype=int), axis=0)
                     # if len(x_datas) > 3:
-                    #     x_datas = np.delete(x_datas, 0, axis=0)
-                    #     t_datas = np.delete(t_datas, 0, axis=0)
-
+                        # x_datas = np.delete(x_datas, 0, axis=0)
+                        # t_datas = np.delete(t_datas, 0, axis=0)
+                
                 # # 둘 곳이 명백할 때, 마지막 4수의 보드 상태와 내 AI답 저장 (학습할 문제와 답 저장)
                 # if is_necessary:
-                #     x_datas_necessary = np.append(x_datas_necessary, board.reshape(1, 15, 15), axis=0)
-                #     t_datas_necessary = np.append(t_datas_necessary, np.array([[y1*15+x1]], dtype=int), axis=0)
+                    # x_datas_necessary = np.append(x_datas_necessary, board.reshape(1, 15, 15), axis=0)
+                    # t_datas_necessary = np.append(t_datas_necessary, np.array([[y1*15+x1]], dtype=int), axis=0)
                 # elif whose_turn == 1:
-                #     x_datas = np.append(x_datas, board.reshape(1, 15, 15), axis=0)
-                #     t_datas = np.append(t_datas, np.array([[y1*15+x1]], dtype=int), axis=0)
-                #     if len(x_datas) > 3:
-                #         x_datas = np.delete(x_datas, 0, axis=0)
-                #         t_datas = np.delete(t_datas, 0, axis=0)
+                    # x_datas = np.append(x_datas, board.reshape(1, 15, 15), axis=0)
+                    # t_datas = np.append(t_datas, np.array([[y1*15+x1]], dtype=int), axis=0)
+                    # if len(x_datas) > 3:
+                    #     x_datas = np.delete(x_datas, 0, axis=0)
+                    #     t_datas = np.delete(t_datas, 0, axis=0)
 
                 # 선택한 좌표에 돌 두기
                 board[y][x] = whose_turn
@@ -301,10 +341,7 @@ while not exit:
                         clean_board_num += 1
                         turn = 0
                         board = np.zeros([size, size])
-                # else:
-                    # print("백 승리!")
-                # print(difference_score_board(whose_turn, size, board), "\n") #print
-            
+                
             # 바둑알, 커서 위치 표시, 마지막 돌 표시, 학습 모드 화면에 표시
             if not exit:
                 if mute:
@@ -319,15 +356,16 @@ while not exit:
             
             # 흑,백 승리 이미지 화면에 추가, 학습하기, 기보 저장
             if game_over:
-                game_trial += 1
-                game_trial_per_ln_5000 += 1
+                resent_who_win.append(whose_turn)
+                if len(resent_who_win) > 100: del resent_who_win[0]
                 str_turns = str_turns + ("" if str_turns=="" else ",") + str(clean_board_num*225 + turn)
                 
                 if whose_turn == 1 and not black_foul: # 흑 승리/백 승리 표시
                     screen.blit(win_black,(0,250))
-                    win_num += 1
+                    if train_with_Yixin: Yixin.Click_setting("plays_w")
                 else:
                     screen.blit(win_white,(0,250))
+                    if train_with_Yixin: Yixin.Click_setting("plays_b")
                 pygame.display.update()
 
                 # x_datas = np.r_[x_datas_necessary, x_datas]
@@ -349,11 +387,13 @@ while not exit:
                 while len(x_datas) >= 100:
                     x_batch = x_datas[:100].reshape(100, 1, 15, 15)
                     t_batch = _change_one_hot_label(t_datas[:100])
+                    
                     grads, loss = network.gradient(x_batch, t_batch, save_loss=True)
                     optimizer.update(network.params, grads)
+                    graph_datas['train_losses'].append(loss)
                     network.learning_num += 100
     
-                    print(time.str_hms_delta(start_time, hms=True), end=" | ")
+                    print(time.str_hms_delta(start_time), end=" | ")
                     print(f"{network.learning_num}문제 학습" + \
                         f" | 손실 {format(loss, '.3f')}", end=" | ")
                     print(f"{str_turns}수" if len_x_datas == len(x_datas) else "")
@@ -362,17 +402,21 @@ while not exit:
                     x_datas = x_datas[100:]
                     t_datas = t_datas[100:]
                 
-                    if (network.learning_num // 5000) != learning_5000_num:
-                        print(f"-> 최근 {game_trial_per_ln_5000}경기 중 승리 {win_num}경기 (승률: {round(win_num/game_trial_per_ln_5000*100, 1)}%)")
-                        learning_5000_num = network.learning_num // 5000
-                        network.save_params(optimizer, lr, str_data_info=str_data_info)
-                        game_trial_per_ln_5000, win_num = 0, 0
+                    if (network.learning_num // learning_num_per_save) != save_num:
+                        win_num = sum(np.array(resent_who_win)==1)
+                        game_num = len(resent_who_win)
+                        print(f"-> 최근 {game_num}경기 중 승리 {win_num}경기 (승률: {round(win_num/game_num*100, 1)}%)")
+                        save_num = network.learning_num // learning_num_per_save
+                        
+                        network.save_params(optimizer, lr, str_data_info)
+                        save_graph_datas(graph_datas, network, optimizer, lr, str_data_info)
+                        network.delete_pre_saved_pkl(learning_num_per_save)
                         print()
+
+                if network.learning_num == goal_learning_num: exit = True
                         
                 x_datas_left = x_datas
                 t_datas_left = t_datas
-                x_datas = np.empty((0, 15, 15), dtype=np.float16)
-                t_datas = np.empty((0, 1), dtype=int)
 
                 # 기보 파일로 저장
                 with open('etc/GiBo_Training.txt', 'a', encoding='utf8') as file:
@@ -381,27 +425,28 @@ while not exit:
                         turn_hangul = "흑" if record[i][2] == 1 else "백"
                         file.write(str(record[i][0]+1)+' '+str(record[i][1]+1)+' '+turn_hangul+'\n')
                     file.write("\n")
-                    
+                
                 game_end = True
 
             # 화면 업데이트
             pygame.display.update()
 
-        # for event in pygame.event.get():
-        #     if event.type==pygame.QUIT:
-        #         pygame.quit()
+        for event in pygame.event.get():
+            if event.type==pygame.QUIT:
+                exit=True
+                game_end=True 
 
-        #     if event.type == pygame.KEYDOWN:
+            if event.type == pygame.KEYDOWN:
 
-        #         if event.key == pygame.K_m: # 음소거
-        #             if not mute:
-        #                 mute = True
-        #                 pygame.mixer.music.pause()
-        #             else:
-        #                 mute = False
-        #                 pygame.mixer.music.unpause()
-
-        # continue # 트레이닝 중일때 나머지 아래 코드 무시
+                if event.key == pygame.K_m: # 음소거
+                    if not mute:
+                        mute = True
+                        pygame.mixer.music.pause()
+                    else:
+                        mute = False
+                        pygame.mixer.music.unpause()
+                         
+        continue # 트레이닝 중일때 나머지 아래 코드 무시
 
         # 입력 받기
         for event in pygame.event.get():
@@ -413,7 +458,7 @@ while not exit:
                 if event.key == pygame.K_SPACE and not training_mode and not game_over: # 돌 두기
 
                     # 플레이어가 두기
-                    if game_mode=="Human_vs_Human" or (game_mode=="Human_vs_AI" and whose_turn == 1):
+                    if game_mode=="Human_vs_Human" or (game_mode=="Human_vs_AI" and whose_turn == -1):
                         
                         # 이미 돌이 놓여 있으면 다시
                         if board[y][x] == -1 or board[y][x] == 1: 
@@ -521,7 +566,7 @@ while not exit:
                         # print(difference_score_board(whose_turn, size, board), "\n") #print
 
                     # AI가 두기
-                    if game_mode=="AI_vs_AI" or (game_mode=="Human_vs_AI" and whose_turn == -1 and not game_over):
+                    if game_mode=="AI_vs_AI" or (game_mode=="Human_vs_AI" and whose_turn == 1 and not game_over):
                         
                         # 사람이 생각한 알고리즘
                         if AI_mode == "Human_Made_Algorithms":
@@ -693,8 +738,10 @@ while not exit:
             elif event.type == pygame.QUIT:
                 exit=True
                 game_end=True
-
-print(f"-> 최근 {game_trial_per_ln_5000}경기 중 승리 {win_num}경기 (승률: {round(win_num/game_trial_per_ln_5000*100, 1)}%)")    
-network.save_params(optimizer, lr, str_data_info=str_data_info)
+  
 print("\nGood Bye")
 pygame.quit()
+
+network.save_params(optimizer, lr, str_data_info=str_data_info)
+plot.loss_graph(graph_datas['train_losses'], smooth=True)
+plot.loss_graph(graph_datas['train_losses'], smooth=False)

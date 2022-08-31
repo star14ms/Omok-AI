@@ -1,15 +1,86 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from common.util import smooth_curve
 import math
+import pickle, os
 # %matplotlib inline 이게 뭐고, 어떻게 사용하는거지???
+
+def save_graph_datas(graph_datas, network, optimizer, lr, str_data_info, save_inside_dir=True, pkl_dir="saved_pkls", verbose=True):
     
+    if "test_accs" not in graph_datas:
+        if network.saved_network_pkl == None:
+            acc = "None"
+        else:
+            acc = network.saved_network_pkl.split(" ")[-5].lstrip("acc_")
+    else:
+        acc = math.floor(graph_datas["test_accs"][-1]*100)/100
+    file_name = f"{str_data_info} ln_{network.learning_num} acc_{acc} " + \
+        f"{optimizer.__class__.__name__} lr_{lr} {network.network_dir} learning_info.pkl"
+    file_path = file_name
+    if save_inside_dir:
+        file_path = f"{pkl_dir}/{network.network_dir}/" + file_path
+
+    if not os.path.exists(f"{pkl_dir}/{network.network_dir}"):
+        os.makedirs(f"{pkl_dir}/{network.network_dir}")
+        print(f"{pkl_dir}/{network.network_dir} 폴더 생성")
+
+    with open(file_path, 'wb') as f:
+        pickle.dump(graph_datas, f)
+
+    if verbose: print(f"\n그래프 데이터 저장 성공!\n({file_name})")
+
+def load_graph_datas(file_name="graph_data.pkl", pkl_dir="saved_pkls"): ### class 밖에선 self 지워야 함
+
+    if (".pkl" not in file_name) or (file_name[-4:] != ".pkl"):
+        file_name = f"{file_name}.pkl"
+    file_path = file_name
+
+    # network_dir = file_path.split(" [")[0].split(" ")[-1] + " [" + file_path.split(" [")[1].rstrip(" params.pkl")
+    network_dir = file_path.split(" ")[-2] # " " -> "_" 같이 수정해주어야 함
+    file_path = f"{network_dir}/{file_path}"
+
+    if (file_path.split("/")[:-1] != f"{pkl_dir}"):
+        file_path = f"{pkl_dir}/{file_path}"
+
+    if not os.path.exists(f"{pkl_dir}/{network_dir}"):
+        os.makedirs(f"{pkl_dir}/{network_dir}")
+        print(f"Error: {pkl_dir}/{network_dir} 폴더가 없어서 생성")
+
+    if not os.path.exists(file_path):
+        print(f"Error: {file_path} 파일이 없음")
+        file_path = file_name
+        if not os.path.exists(file_path):
+            print(f"Error: {file_path} 파일이 없음")
+            file_path = f"{pkl_dir}/{file_name}"
+            if not os.path.exists(file_path):
+                print(f"Error: {file_name} 파일이 없음")
+                return
+
+    # main process
+    with open(file_path, 'rb') as f:
+        graph_datas = pickle.load(f)
+        
+    print(f"\n그래프 데이터 불러오기 성공!\n({file_name})")
+    return graph_datas
+
+def smooth_curve(x):
+    """損失関数のグラフを滑らかにするために用いる
+
+    参考：http://glowingpython.blogspot.jp/2012/02/convolution-with-numpy.html
+    """
+    window_len = 11
+    s = np.r_[x[window_len-1:0:-1], x, x[-1:-window_len:-1]]
+    w = np.kaiser(window_len, 2)
+    y = np.convolve(w/w.sum(), s, mode='valid')
+    return y[5:len(y)-5]
+
 class plot:
-    
+
+################################################################################################################################
+
     def loss_graph(train_losses, smooth=True):
         x = np.arange(len(train_losses))
     
-        if smooth:
+        if smooth: #  and len(train_losses) > 10
             plt.plot(x, smooth_curve(train_losses), f"-", label="loss")
         else:
             plt.plot(x, train_losses, f"-", label="loss")
@@ -126,20 +197,22 @@ class plot:
     
 ################################################################################################################################
 
-    def filter_show(filters, filters_name, nx=5, margin=3, scale=10):
+    def filter_show(img, nx=5, margin=3, scale=10, title=None, gray=True, adjust={'l':0, 'r':1, 'b':0, 't':1, 'hs':0.05, 'ws':0.05}):
         """
         c.f. https://gist.github.com/aidiary/07d530d5e08011832b12#file-draw_weight-py
         """
-        FN, C, FH, FW = filters.shape
+        FN, _, _, _ = img.shape
         ny = int(np.ceil(FN / nx))
+        l, r, b, t, hs, ws = adjust['l'], adjust['r'], adjust['b'], adjust['t'], adjust['hs'], adjust['ws']
     
         fig = plt.figure()
-        fig.subplots_adjust(left=0, right=1, bottom=0, top=1, hspace=0.05, wspace=0.05)
-    
+        fig.subplots_adjust(left=l, right=r, bottom=b, top=t, hspace=hs, wspace=ws)
+        cmap='gray' if gray else plt.cm.gray_r
+
         for i in range(FN):
             ax = fig.add_subplot(ny, nx, i+1, xticks=[], yticks=[])
-            plt.title(f"{filters_name} ({i+1})") ### plot() 후에 나와야 함
-            ax.imshow(filters[i, 0], cmap=plt.cm.gray_r, interpolation='nearest')
+            if title!=None: plt.title(f"{title} ({i+1})") ### plot() 후에 나와야 함
+            ax.imshow(img[i, 0], cmap=cmap, interpolation='nearest')
         plt.show()
 
 
@@ -169,10 +242,15 @@ class plot:
         plt.show()
     
 
-    def all_filters_compare(params1, params2, nx=5):
-        for key in params1.keys():
-            if params1[key].ndim == 4:
-                plot.compare_filter(params1[key], params2[key], key, nx=nx)
+    def all_filters_compare(network, pkl_name, nx=5):
+        params0 = {} ### 복사 안하고 가리키면 가리킨 곳이 바뀔때 같이 변해버림
+        for key, value in network.params.items():
+            params0[key] = value
+        network.load_params(pkl_name)
+        
+        for key in params0.keys():
+            if params0[key].ndim == 4:
+                plot.compare_filter(params0[key], network.params[key], key, nx=nx)
 
 ################################################################################################################################
 
@@ -191,17 +269,18 @@ class plot:
         plt.show()
 
 
-    def compare_activation_value_distribution(activation_values_list, learning_num_per_, ylim=50000):
+    def compare_activation_value_distribution(activation_values_list, pkls_name, ylim=50000):
         # plt.figure(figsize=(3*len(activation_values),5))
         plt.subplots_adjust(left=0.05, right=0.98, bottom=0.05, top=0.95, wspace=0.2)
 
         for i_list, activation_values in enumerate(activation_values_list):
+            title = " ".join(pkls_name[i_list].split(" ")[-7:-5])
             for i, a in activation_values.items():
                 plt.subplot(len(activation_values_list), len(activation_values), i_list*len(activation_values)+i+1)
                 if i_list==0:
-                    plt.title(str(i+1) + "-activation\nLearned "+str((i_list+1)*learning_num_per_) + " data")
+                    plt.title(str(i+1) + f"-activation\n{title}")
                 else:
-                    plt.title("Learned "+str((i_list+1)*learning_num_per_) + " data")
+                    plt.title(f"{title}")
                 if i_list != len(activation_values_list)-1: plt.xticks([], [])
                 plt.xlim(0, 1)
                 plt.ylim(0, ylim)

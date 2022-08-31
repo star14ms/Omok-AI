@@ -5,7 +5,7 @@ sys.path.append('modules')
 import pickle
 import numpy as np
 from collections import OrderedDict
-from common.layers import *
+from modules.common.layers import *
 from modules.test import print_board
 import math
 from modules.common.util import bcolors, __get_logger
@@ -24,13 +24,13 @@ class DeepConvNet:
             'Conv', 'Relu',
             'Affine', 'SoftmaxLoss'
         ], params_ = [(1, 15, 15),
-            {'filter_num':64, 'filter_size':3, 'pad':1, 'stride':1},
-            {'filter_num':64, 'filter_size':3, 'pad':1, 'stride':1},
-            {'filter_num':64, 'filter_size':3, 'pad':1, 'stride':1},
-            {'filter_num':64, 'filter_size':3, 'pad':1, 'stride':1},
+            {'filter_num':256, 'filter_size':3, 'pad':1, 'stride':1},
+            {'filter_num':256, 'filter_size':3, 'pad':1, 'stride':1},
+            {'filter_num':256, 'filter_size':3, 'pad':1, 'stride':1},
+            {'filter_num':256, 'filter_size':3, 'pad':1, 'stride':1},
             225
         ], dropout_ration=0.5, pooling_params={"pool_h": 2, "pool_w": 2, "stride": 2}, 
-           weight_decay_lambda=0, mini_batch_size=100, saved_network_pkl=None, not0_size=4):
+           weight_decay_lambda=0, mini_batch_size=100, saved_network_pkl=None, not0_size=4, params_dtype=np.float16):
         
         layers_info = [layer.lower() for layer in layers_info]
         self.network_infos = {} # pkl파일에 저장할 신경망 정보
@@ -48,6 +48,7 @@ class DeepConvNet:
         
         self.not0_size = not0_size # 오답 샘플 개수
 
+        self.params_dtype = params_dtype
         self.loaded_params = {} ### 저장해놨다가 네트워크 생성 후 다시 self.params에 업데이트 
         self.layer_idxs_used_params = [] # 가중치와 편향을 사용하는 레이어들의 위치
         self.layers = [] # 레이어 저장
@@ -62,27 +63,28 @@ class DeepConvNet:
                 layers_info = self.layers_info # 불러온 레이어 데이터로 레이어를 만들어야함
                 params_ = self.params_
                 self.saved_network_pkl = saved_network_pkl
-
-        # 네트워크 정보 문자로 나타내기 (네트워크를 저장할 때 파일 이름으로 쓰임)
-        layers_info_str = ""
-        for layer in self.layers_info:
-            if layer == "conv":
-                layers_info_str = layers_info_str + "_C"
-            elif layer == "convsum":
-                layers_info_str = layers_info_str + "_Csum"
-            elif layer == "affine":
-                layers_info_str = layers_info_str + "_A"
-            elif layer == "relu":
-                layers_info_str = layers_info_str + "R"
-            elif "norm" in layer:
-                layers_info_str = layers_info_str + "N"
-            elif "dropout" in layer:
-                layers_info_str = layers_info_str + "D"
-            elif layer == "softmaxloss" or layer == "smloss":
-                layers_info_str = layers_info_str + "_Smloss"
-            elif layer == "not0samplingloss" or "not0samploss":
-                layers_info_str = layers_info_str + "_N0sloss"
-        self.network_dir = layers_info_str.lstrip("_")
+                self.network_dir = self.saved_network_pkl.split(' ')[-2]
+        else:
+            # 네트워크 정보 문자로 나타내기 (네트워크를 저장할 때 파일 이름으로 쓰임)
+            layers_info_str = ""
+            for layer in self.layers_info:
+                if layer == "conv":
+                    layers_info_str = layers_info_str + "_C"
+                elif layer == "convsum":
+                    layers_info_str = layers_info_str + "_Csum"
+                elif layer == "affine":
+                    layers_info_str = layers_info_str + "_A"
+                elif layer == "relu":
+                    layers_info_str = layers_info_str + "R"
+                elif "norm" in layer:
+                    layers_info_str = layers_info_str + "N"
+                elif "dropout" in layer:
+                    layers_info_str = layers_info_str + "D"
+                elif layer == "softmaxloss" or layer == "smloss":
+                    layers_info_str = layers_info_str + "_Smloss"
+                elif layer == "not0samplingloss" or "not0samploss":
+                    layers_info_str = layers_info_str + "_N0sloss"
+            self.network_dir = layers_info_str.lstrip("_")
 
         # 매개변수를 사용하는 층의 뉴런 하나당 앞 층과 연결된 노드 수, 출력 크기 계산
         node_nums = np.array([0 for i in range(len(params_)-1)])
@@ -173,9 +175,9 @@ class DeepConvNet:
 
             if 'conv' in layer or 'convolution' in layer:
                 self.params['W' + str(idx+1)] = weight_init_scales[idx] * np.random.randn(  
-                    params_[idx+1]['filter_num'], pre_channel_num, 
-                    params_[idx+1]['filter_size'], params_[idx+1]['filter_size'])
-                self.params['b' + str(idx+1)] = np.zeros(params_[idx+1]['filter_num'])
+                    params_[idx+1]['filter_num'], pre_channel_num,
+                    params_[idx+1]['filter_size'], params_[idx+1]['filter_size']).astype(params_dtype)
+                self.params['b' + str(idx+1)] = np.zeros(params_[idx+1]['filter_num'], dtype=params_dtype)
                 pre_channel_num = params_[idx+1]['filter_num']
                 self.layers.append(Convolution(self.params['W' + str(idx+1)], self.params['b' + str(idx+1)], 
                 params_[idx+1]['stride'], params_[idx+1]['pad'], reshape_2dim= (False if 'sum' not in layer else True) ))
@@ -184,16 +186,16 @@ class DeepConvNet:
                 idx += 1
 
             elif layer == 'affine':
-                self.params['W' + str(idx+1)] = weight_init_scales[idx] * np.random.randn( node_nums[idx], out_sizes[idx] )
-                self.params['b' + str(idx+1)] = np.zeros(out_sizes[idx])
+                self.params['W' + str(idx+1)] = weight_init_scales[idx] * np.random.randn( node_nums[idx], out_sizes[idx] ).astype(params_dtype)
+                self.params['b' + str(idx+1)] = np.zeros(out_sizes[idx], dtype=params_dtype)
                 self.layers.append(Affine(self.params['W' + str(idx+1)], self.params['b' + str(idx+1)]))
                 
                 self.layer_idxs_used_params.append(layer_idx)
                 idx += 1
 
             elif layer == 'norm' or layer == 'batchnorm':
-                self.params['gamma' + str(idx)] = np.ones(out_sizes[idx-1])
-                self.params['beta' + str(idx)] = np.zeros(out_sizes[idx-1])
+                self.params['gamma' + str(idx)] = np.ones(out_sizes[idx-1], dtype=params_dtype)
+                self.params['beta' + str(idx)] = np.zeros(out_sizes[idx-1], dtype=params_dtype)
                 self.layers.append(BatchNormalization(self.params['gamma' + str(idx)], self.params['beta' + str(idx)]))
                 
             elif layer == 'relu':
@@ -221,8 +223,10 @@ class DeepConvNet:
         
         # 불러온 신경망의 매개변수들 덮어쓰기
         if saved_network_pkl != None:
-            self.params = self.loaded_params ### 네트워크를 self.params에 옮기지 않았음 
+            self.params = self.loaded_params ### 네트워크를 self.params에 옮기지 않았음
             for i, layer_idx in enumerate(self.layer_idxs_used_params): ### layers, layer_idxs_used_params 먼저 로드해야 함
+                self.params['W' + str(i+1)] = self.params['W' + str(i+1)].astype(np.float64)
+                self.params['b' + str(i+1)] = self.params['b' + str(i+1)].astype(np.float64)
                 self.layers[layer_idx].W = self.params['W' + str(i+1)]
                 self.layers[layer_idx].b = self.params['b' + str(i+1)]
 
@@ -353,8 +357,13 @@ class DeepConvNet:
         else:
             return grads, loss
 
-    def save_params(self, optimizer, lr, test_accs=[], str_data_info="", save_inside_dir=True, pkl_dir="saved_pkls"):
+    def save_params(self, optimizer, lr, str_data_info="", test_accs=[], save_inside_dir=True, pkl_dir="saved_pkls", verbose=True):
         
+        save_params = {}
+        for i, layer_idx in enumerate(self.layer_idxs_used_params):
+            save_params['W' + str(i+1)] = self.params['W' + str(i+1)].astype(self.params_dtype)
+            save_params['b' + str(i+1)] = self.params['b' + str(i+1)].astype(self.params_dtype)
+
         self.network_infos["layers_info"]         = self.layers_info
         self.network_infos["params_"]             = self.params_
         self.network_infos["dropout_ration"]      = self.dropout_ration
@@ -363,7 +372,7 @@ class DeepConvNet:
         # self.network_infos["mini_batch_size"]     = self.mini_batch_size
         self.network_infos["saved_network_pkl"]   = self.saved_network_pkl
         self.network_infos["learning_num"]        = self.learning_num
-        self.network_infos["params"]              = self.params
+        self.network_infos["params"]              = save_params
         # self.network_infos["layers"] = self.layers # pkl파일 용량이 너무 커짐 (이미 layers_info가 있으니 똑같이 다신 만들 수 있음)
         # self.network_infos["layer_idxs_used_params"] = self.layer_idxs_used_params  ### 새로운 레이어들이 또 append됨
         # print(self.saved_network_pkl)
@@ -371,11 +380,11 @@ class DeepConvNet:
             if self.saved_network_pkl == None:
                 acc = "None"
             else: ### self. 빼먹음
-                acc = self.saved_network_pkl.split(" ")[-6].lstrip("acc_") # " " -> "_" 같이 수정해주어야 함
+                acc = self.saved_network_pkl.split(" ")[-5].lstrip("acc_") # " " -> "_" 같이 수정해주어야 함
         else:
             acc = math.floor(test_accs[-1]*100)/100
         
-        file_name = f"{str_data_info} acc_{acc} ln_{self.learning_num} " + \
+        file_name = f"{str_data_info} ln_{self.learning_num} acc_{acc} " + \
             f"{optimizer.__class__.__name__} lr_{lr} {self.network_dir} params.pkl"
         file_path = file_name
         
@@ -395,7 +404,7 @@ class DeepConvNet:
         with open(file_path, 'wb') as f:
             pickle.dump(self.network_infos, f)
 
-        print(f"\n네트워크 저장 성공!\n({file_name})")
+        if verbose: print(f"\n네트워크 저장 성공!\n({file_name})")
 
     def load_params(self, file_name="params.pkl", pkl_dir="saved_pkls", init=False):
         
@@ -450,7 +459,7 @@ class DeepConvNet:
         print(f"\n네트워크 불러오기 성공!\n({file_name})")
         return True
 
-    def think_win_xy(self, board, whose_turn, verbose=True):
+    def think_win_xy(self, board, whose_turn, verbose=False):
         scores = self.predict(board.reshape(1, 1, 15, 15))
         x, y = scores.argmax()%15, scores.argmax()//15
         
@@ -485,4 +494,19 @@ class DeepConvNet:
                 x, y = scores_nomalized.argmax()%15, scores_nomalized.argmax()//15
         return x, y
 
+    def delete_pre_saved_pkl(self, learning_num_per_save, remove_graphdata=True, pkl_dir="saved_pkls"):
+        pre_saved_num = self.learning_num - learning_num_per_save
+
+        ln_ = self.saved_network_pkl.split('ln_')
+        others = ln_[1].split(' ')
+
+        pre_saved_pkl = ln_[0] + f'ln_{pre_saved_num} ' + ' '.join(others[1:]) + '.pkl'
+        file_path = f"{pkl_dir}/{self.network_dir}/" + pre_saved_pkl
+
+        if os.path.isfile(file_path) and pre_saved_num % 10000 != 0:
+            os.remove(file_path)
+
+        if remove_graphdata:
+            file_path2 = file_path.replace('params', 'learning_info')
+            if os.path.isfile(file_path2): os.remove(file_path2)
 

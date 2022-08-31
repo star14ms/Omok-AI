@@ -179,7 +179,7 @@ def num_Four(whose_turn, board, x, y, placed):
     return four
 
 # 3 개수 (3: 다음 차례에 열린 4를 만들 수 있는 곳)
-def num_Three(whose_turn, board, x, y, placed):
+def num_Three(whose_turn, board, x, y, placed, verbose=False):
     three = 0
     size = board.shape[0]
     _board = board.copy()
@@ -230,15 +230,15 @@ def num_Three(whose_turn, board, x, y, placed):
     # \ 대각선 3 검사
     x_r = x-3 ### -4 -> -3 (복붙주의)
     y_d = y-3
-    for i in range(4):
+    for _ in range(4):
         if x_r > -1 and x_r+3 < size and y_d > -1 and y_d+3 < size:
             for k in range(4):
                 line[k] = _board[y_d+k][x_r+k]
-
+            # if verbose: print(line)
             if sum(line) == whose_turn*3:
                 if (x_r-1 > -1) and (y_d-1 > -1) and (x_r+4 < size) and (y_d+4 < size):
                     
-                    if (_board[y_d-1][x_r] == 0) and (_board[y_d+4][x_r] == 0):
+                    if (_board[y_d-1][x_r-1] == 0) and (_board[y_d+4][x_r+4] == 0): ### x_r -> x_r-1/x_r+4
                         if (whose_turn == 1) and (x_r-2 > -1) and (y_d-2 > -1) and (x_r+5 < size) and (y_d+5 < size):
                             if ((_board[y_d-2][x_r-2]==whose_turn) and (x_r+6 < size) and (y_d+6 < size) and (_board[y_d+6][x_r+6]==whose_turn) or
                                 (_board[y_d+5][x_r+5]==whose_turn) and (x_r-3 > -1) and (y_d-3 > -1) and (_board[y_d-3][x_r-3]==whose_turn)):
@@ -255,11 +255,10 @@ def num_Three(whose_turn, board, x, y, placed):
     # / 대각선 3 검사
     x_r = x-3
     y_u = y+3
-    for i in range(4):
+    for _ in range(4):
         if x_r > -1 and x_r+3 < size and y_u+1 < size and y_u-3 > -1: ### (y_u-1 > -1), (y_u+3 < size) -> (y_u+1 < size), (y_u-3 > -1)
             for k in range(4):
                 line[k] = _board[y_u-k][x_r+k]
-
             if sum(line) == whose_turn*3:
                 if (x_r-1 > -1) and (x_r+4 < size) and (y_u+1 < size) and (y_u-4 > -1): ### y_u-1, y_u+4 -> y_u+1, y_u-4
                     

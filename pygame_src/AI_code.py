@@ -1,9 +1,9 @@
 import numpy as np
 import random # 점수가 같은 좌표들 중 하나 고르기
-from pygame_src.foul_detection import isFive, num_Four, num_Three
+from pygame_src.foul_detection import isFive, num_Four, num_Three, isFoul
 from modules.common.util import bcolors
 
-def AI_think_win_xy(whose_turn, board, all_molds, mok_value=1.2, verbose=True, return_is_necessary=False):
+def AI_think_win_xy(whose_turn, board, all_molds, mok_value=1.2, verbose=False, return_is_necessary=False):
     board = board.copy()
     size = board.shape[0]
     is_necessary = True
@@ -26,9 +26,9 @@ def AI_think_win_xy(whose_turn, board, all_molds, mok_value=1.2, verbose=True, r
     
     # 우선 순위가 가장 높은 좌표를 선택
     if self_5_xy[0] != None: # 1위
-        x, y = self_5_xy[1], self_5_xy[0]
+        x, y = self_5_xy[0], self_5_xy[1]
     elif opon_5_xy[0] != None: # 2위
-        x, y = opon_5_xy[1], opon_5_xy[0]
+        x, y = opon_5_xy[0], opon_5_xy[1]
     elif self_4_xys[0] != None: # 3위
         
         x1, y1 = self_4_xys[0][0], self_4_xys[0][1] ### value_board는 [y, x] 형태
@@ -169,9 +169,10 @@ def AI_think_win_xy(whose_turn, board, all_molds, mok_value=1.2, verbose=True, r
         np.set_printoptions(linewidth=np.inf, formatter={'all':lambda _x: ( # 세자리 출력(100) 방지
             bcolors.according_to_score(_x) + str(int(np.minimum(_x, 99))).rjust(2) + bcolors.ENDC)})
         scores_nomalized = ( (scores - np.min(scores)) / (scores.ptp() + 1e-7) * 100)
-        print(scores[5, 6], scores[5, 8], scores[8, 6], scores[8, 8])
+        # print(scores[5, 6], scores[5, 8], scores[8, 6], scores[8, 8])
         print("\n"+"="*40+"\n")
-        print(f"4목 흑/백 {self_5_xy}/{opon_5_xy}, 3목 흑/백 {self_4_xys}/{opon_4_xys}")
+        str_self_opon = "흑/백" if whose_turn==1 else "백/흑"
+        print(f"4목 {str_self_opon} {self_5_xy}/{opon_5_xy}, 3목 {str_self_opon} {self_4_xys}/{opon_4_xys}")
         print(scores_nomalized, "\n")
     
         if all_molds and len(np.where(board != 0)[0]) == 2:
@@ -185,9 +186,9 @@ def AI_think_win_xy(whose_turn, board, all_molds, mok_value=1.2, verbose=True, r
                 print("["+str(xy[0]+1) +","+ str(xy[1]+1)+"]", end=" ")
             print("랜덤 선택")
     
-        print("기대점수 1위: x="+str(expect_xy[0]+1) + " y="+str(expect_xy[1]+1), end=", ")
+        print("기대점수 1위: x="+str(expect_xy[0]) + " y="+str(expect_xy[1]), end=", ")
         print(f"{round(scores[expect_xy[1], expect_xy[0]], 3)}점")
-        print("우선순위 1위: x="+str(x+1) + " y="+str(y+1), end=", ")
+        print("우선순위 1위: x="+str(x) + " y="+str(y), end=", ")
         print(f"{round(scores[y][x], 3)}점\n")
         # print("="*40)
 
@@ -209,13 +210,10 @@ def canFive(whose_think, whose_turn, board):
             if sum(line) == whose_turn * 4:
                 #  흑 금수는 제외하고, 나머지 한 칸 반환
                 for i in range(5):
-                    if board[y][x+i] == 0:
-                        if (whose_think == 1) and ( ### 먼저 빈자리를 찾고, 그곳을 검사해야 함
-                            isFive(whose_think, board, x+i, y, placed=False) == None or ### 백이 둘 때, 흑 장목검사는 다른 라인들을 해야 함
-                            num_Four(whose_think, board, x+i, y, placed=False) >= 2 or ### x -> x+i
-                            num_Three(whose_think, board, x+i, y, placed=False) >= 2):
-                            continue
-                        return [y, x+i]
+                    if board[y][x+i] == 0: ### 먼저 빈자리를 찾고, 그곳을 검사해야 함
+                        if whose_think == 1 and isFoul(x+i, y, board, whose_think) != "No":
+                            continue ### x -> x+i, 백이 둘 때, 흑 장목검사는 다른 라인들을 해야 함
+                        return [x+i, y]
 
     # 세로 감지
     for y in range(size - 4):
@@ -226,12 +224,9 @@ def canFive(whose_think, whose_turn, board):
 
                 for i in range(5):
                     if board[y+i][x] == 0:
-                        if (whose_think == 1) and (
-                            isFive(whose_think, board, x, y+i, placed=False) == None or
-                            num_Four(whose_think, board, x, y+i, placed=False) >= 2 or
-                            num_Three(whose_think, board, x, y+i, placed=False) >= 2):
+                        if whose_think == 1 and isFoul(x, y+i, board, whose_think) != "No":
                             continue
-                        return [y+i, x]
+                        return [x, y+i]
     
     # 대각선 감지
     line = [0, 0, 0, 0, 0] # 대각선 감지할 때 이용
@@ -245,12 +240,9 @@ def canFive(whose_think, whose_turn, board):
 
                 for i in range(5):
                     if board[y+i][x+i] == 0:
-                        if (whose_think == 1) and (
-                            isFive(whose_think, board, x+i, y+i, placed=False) == None or
-                            num_Four(whose_think, board, x+i, y+i, placed=False) >= 2 or
-                            num_Three(whose_think, board, x+i, y+i, placed=False) >= 2):
+                        if whose_think == 1 and isFoul(x+i, y+i, board, whose_think) != "No":
                             continue
-                        return [y+i, x+i]
+                        return [x+i, y+i]
 
             # / 검사
             for i in range(5):
@@ -259,12 +251,9 @@ def canFive(whose_think, whose_turn, board):
 
                 for i in range(5):
                     if board[y+4-i][x+i] == 0:
-                        if (whose_think == 1) and (
-                            isFive(whose_think, board, x+i, y+4-i, placed=False) == None or
-                            num_Four(whose_think, board, x+i, y+4-i, placed=False) >= 2 or
-                            num_Three(whose_think, board, x+i, y+4-i, placed=False) >= 2):
+                        if whose_think == 1 and isFoul(x+i, y+4-i, board, whose_think) != "No":
                             continue
-                        return [y+4-i, x+i]
+                        return [x+i, y+4-i]
     
     return [None]
 
@@ -285,10 +274,7 @@ def canFour(whose_think, whose_turn, board):
                         # 흑 금수는 제외하고, 나머지 한 칸 반환
                         for i in range(4):
                             if board[y][x+i] == 0:
-                                if (whose_think == 1) and (
-                                    isFive(whose_think, board, x+i, y, placed=False) == None or
-                                    num_Four(whose_think, board, x+i, y, placed=False) >= 2 or ### x -> x+i
-                                    num_Three(whose_think, board, x+i, y, placed=False) >= 2):
+                                if whose_think == 1 and isFoul(x+i, y, board, whose_think) != "No":
                                     continue
                                 canFour_xy_list.append([x+i, y])
     
@@ -308,10 +294,7 @@ def canFour(whose_think, whose_turn, board):
 
                         for i in range(4):
                             if board[y+i][x] == 0:
-                                if (whose_think == 1) and (
-                                    isFive(whose_think, board, x, y+i, placed=False) == None or
-                                    num_Four(whose_think, board, x, y+i, placed=False) >= 2 or
-                                    num_Three(whose_think, board, x, y+i, placed=False) >= 2):
+                                if whose_think == 1 and isFoul(x, y+i, board, whose_think) != "No":
                                     continue
                                 canFour_xy_list.append([x, y+i])
     
@@ -324,21 +307,18 @@ def canFour(whose_think, whose_turn, board):
     for y in range(size - 3):
         for x in range(size - 3):
             
-            for i in range(4):
-                line[i] = board[y+i][x+i]
+            for n in range(4):
+                line[n] = board[y+n][x+n]
             if sum(line) == whose_turn * 3:
 
                 if x-1 > -1 and x+4 < size and y-1 > -1 and y+4 < size:
                     if board[y-1][x-1] == 0 and board[y+4][x+4] == 0:
 
-                        for k in range(4):
-                            if board[y+k][x+k] == 0:
-                                if (whose_think == 1) and (
-                                    isFive(whose_think, board, x+i, y+i, placed=False) == None or
-                                    num_Four(whose_think, board, x+i, y+i, placed=False) >= 2 or
-                                    num_Three(whose_think, board, x+i, y+i, placed=False) >= 2):
+                        for i in range(4):
+                            if board[y+i][x+i] == 0:
+                                if whose_think == 1 and isFoul(x+i, y+i, board, whose_think) != "No":
                                     continue
-                                canFour_xy_list.append([x+k, y+k])
+                                canFour_xy_list.append([x+i, y+i])
     
     if len(canFour_xy_list) == vertical_four_num + 2:
         return canFour_xy_list[-2:]
@@ -348,21 +328,18 @@ def canFour(whose_think, whose_turn, board):
     for y in range(size - 3):
         for x in range(size - 3):        
         
-            for i in range(4):
-                line[i] = board[y+i][x+3-i]
-            if sum(line) == whose_turn * 3: ### 4 -> 3 복붙
+            for n in range(4):
+                line[n] = board[y+n][x+3-n]
+            if sum(line) == whose_turn * 3: ### 4 -> 3 복붙 주의
 
                 if x+3+1 < size and x+3-4 > -1 and y-1 > -1 and y+4 < size: ### x+1 > size -> x+1 < size
                     if board[y-1][x+3+1] == 0 and board[y+4][x+3-4] == 0: ### x+1, x-4 -> x+3+1, x+3-4 (현재 x의 +3이 기준)
                         
-                        for k in range(4):
-                            if board[y+k][x+3-k] == 0:
-                                if (whose_think == 1) and (
-                                    isFive(whose_think, board, x+i, y+4-i, placed=False) == None or
-                                    num_Four(whose_think, board, x+i, y+4-i, placed=False) >= 2 or
-                                    num_Three(whose_think, board, x+i, y+4-i, placed=False) >= 2):
+                        for i in range(4):
+                            if board[y+i][x+3-i] == 0:
+                                if whose_think == 1 and isFoul(x+3-i, y+i, board, whose_think) != "No":
                                     continue
-                                canFour_xy_list.append([x+3-k, y+k])
+                                canFour_xy_list.append([x+3-i, y+i])
     
     if len(canFour_xy_list) == diagonal_four_num1 + 2:
         return canFour_xy_list[-2:]

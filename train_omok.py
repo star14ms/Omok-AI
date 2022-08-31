@@ -1,15 +1,15 @@
 import numpy as np
 from network import DeepConvNet
-from modules.common.trainer import Trainer, load_graph_datas
+from modules.common.trainer import Trainer
 from modules.make_datas import board_datas as bd
 import time
-from modules.plot import plot
+from modules.plot import *
 from modules.test import print_board, test
 
 # 학습할 데이터 만들기
 (x_datas, t_datas) = bd.merge(bd.make_toNmok(5), bd.make_toNmok(4))
 (x_train, t_train), (x_test, t_test) = bd.split_train_test(x_datas, t_datas)
-str_data_info = "4to5, 3to4 (3)"
+str_data_info = "with_Yixin (x26f256)"
 
 train_network = False
 saved_network_pkl = None
@@ -21,9 +21,10 @@ saved_graphdata_pkl = None
 # saved_network_pkl = "4to5 (1) acc_99.93 ln_28600 Momentum1 lr_0.01 CR_CR_CR_CsumR_Smloss params"
 # saved_network_pkl = "4to5 Adam1 lr_0.01 ln_28600 acc_100.0 CR_CR_CR_CsumR_Smloss params"
 # saved_network_pkl = "4to5, 3to4 (2) acc_99.97 ln_48000 Adam2 lr_0.01 CR_CR_CR_CsumR_Smloss params"
+# saved_network_pkl = "with_Yixin (x26f256) ln_40000 acc_None Adam lr_0.01 CR_CR_CR_CR_A_Smloss params"
 
 # ================================ v 주석을 풀면 지난 학습정보 그래프 데이터 불러오기 (그래프 출력용)
-# saved_graphdata_pkl = "Adam1 lr_0.01 ln_57200 acc_70.76 CR_CR_CR_CR_ANR_AN0sloss graphdata"
+# saved_graphdata_pkl = "training with myAI (x1) ln_0 acc_70.76 Adam lr_0.01 CR_CR_CR_CR_A_Smloss learninginfo"
 
 if saved_graphdata_pkl != None:
     graph_datas = load_graph_datas(saved_graphdata_pkl)
@@ -42,11 +43,11 @@ if train_network:
     print("\n학습 시작!")
     start = time.time()
     trainer.train()
+    print(str_hms_delta(start)) # 소요 시간 출력
 
-    # 소요 시간 출력
-    time_delta = int(time.time() - start)
-    h, m, s = (time_delta // 3600), (time_delta//60 - time_delta//3600*60), (time_delta % 60)
-    print(f"\n{h}h {m}m {s}s") 
+# network.save_params(trainer.optimizer, trainer.optimizer.lr, str_data_info, verbose=True)
+# save_graph_datas(graph_datas, network, trainer.optimizer, trainer.optimizer.lr, str_data_info)
+# exit()
 
 # 학습된 신경망, 그래프 데이터 저장, 학습 그래프 출력
 if train_network:
@@ -55,16 +56,16 @@ if train_network:
         network.save_params(trainer.optimizer, trainer.optimizer.lr, trainer.test_accs, str_data_info)
     else:
         print("저장 안했다^^")
-            
+    # exit()
     a = input("\n학습 정보를 저장할거니? (그래프 출력용) 예(any)/아니오(f) : ")
     if a != "f":
-        trainer.save_graph_datas(network, str_data_info)
+        save_graph_datas(trainer.graph_datas, network, trainer.optimizer, trainer.optimizer.lr, str_data_info)
     else:
         print("저장 안했다^^")
     
-    # plot.loss_graph(trainer.train_losses, smooth=False)
-    # plot.loss_graph(trainer.train_losses, smooth=True)
-    # plot.accuracy_graph(trainer.train_accs, trainer.test_accs)
+    plot.loss_graph(trainer.train_losses, smooth=False)
+    plot.loss_graph(trainer.train_losses, smooth=True)
+    plot.accuracy_graph(trainer.train_accs, trainer.test_accs)
 
 # 정확도 구하고, 맞은 or 틀린 문제 확인, 테스트
 # accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True, verbose=True) # , multiple_answers=True
@@ -72,33 +73,36 @@ if train_network:
 # test.random_picks(network, x_datas, t_datas) # 4to5 (0, 825), (825, 1650), (1650, 2255), (2255, 2860)
 # test.pick(network, x_datas, t_datas, 0)
 
-# # 합성곱 필터 시각화하기
-# params0 = {} ### 복사 안하고 가리키면 가리킨 곳이 바뀔때 같이 변해버림
-# for key, value in network.params.items():
-#     params0[key] = value
-# network.load_params("training with myAI (1) acc_None ln_100010 Adam lr_0.01 CR_CR_CR_CR_A_Smloss params")
-# plot.all_filters_compare(params0, network.params, nx=16)
+# # # 합성곱 필터 시각화하기
+# pkl_name = "with myAI's (x8x26) ln_400000 acc_None Adam lr_0.01 CR_CR_CR_CR_A_Smloss params"
+# plot.all_filters_compare(network, pkl_name, nx=16)
 
 # # 각 pkl별 정확도, 활성화 값 분포 비교
 pkls_name = [
     # "4to5, 3to4 (2) acc_99.97 ln_48000 Adam2 lr_0.01 CR_CR_CR_CsumR_Smloss params",
     # "training with myAI acc_99.97 ln_65000 Adam lr_0.01 CR_CR_CR_CsumR_Smloss params",
     
-    # "Adam1 lr_0.01 ln_85800 acc_59.86 CR_CR_CR_CR_ANR_ASmloss params" # 
+    # "Adam1 lr_0.01 ln_85800 acc_59.86 CR_CR_CR_CR_ANR_ASmloss params",
 
     # "training with myAI (1) acc_None ln_105075 Adam lr_0.01 CR_CR_CR_CR_ANR_A_Smloss params",
-
-    "with myAI's (x8) acc_None ln_100000 Adam lr_0.01 CR_CR_CR_CR_A_Smloss params",
+    # "with Yixin (x8f256) ln_10000 acc_None Adam lr_0.01 CR_CR_CR_CR_A_Smloss params",
+    "with_Yixin (x26f256) ln_20000 acc_None Adam lr_0.01 CR_CR_CR_CR_A_Smloss params",
+    "with_Yixin (x26f256) ln_40000 acc_None Adam lr_0.01 CR_CR_CR_CR_A_Smloss params",
+    "with_Yixin (x26f256) ln_60000 acc_None Adam lr_0.01 CR_CR_CR_CR_A_Smloss params",
+    "with_Yixin (x26f256) ln_80000 acc_None Adam lr_0.01 CR_CR_CR_CR_A_Smloss params",
+    "with_Yixin (x26f256) ln_100000 acc_None Adam lr_0.01 CR_CR_CR_CR_A_Smloss params",
 ]
 activation_values_list = []
+start = time.time()
 
 for i in range(len(pkls_name)):
     network.load_params(file_name=pkls_name[i])
-    accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True, important_verbose=True)
-    _, activation_values = network.predict(x_datas[:500], save_activation_value_distribution=True)
+    accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True, important_verbose=True, verbose=False)
+    _, activation_values = network.predict(x_datas[:100], save_activation_value_distribution=True)
     activation_values_list.append(activation_values)
+    print(plot.str_hms_delta(start))
     
-plot.compare_activation_value_distribution(activation_values_list, learning_num_per_=20000, ylim=200000)
+plot.compare_activation_value_distribution(activation_values_list, pkls_name, ylim=20000)
 
 # # 손실 함수가 높아지는 이유: 답이 2개이기 때문에 softmax확률이 5:5로 분배됨, 임의로 정답 라벨을 수정해버려서
 # from modules.common.functions import softmax, cross_entropy_error
