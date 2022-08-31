@@ -18,16 +18,17 @@ class DeepConvNet:
     
     def __init__(self, 
         layers_info = [
-            'Conv', 'Norm', 'Relu',
-            'Conv', 'Norm', 'Relu',
-            'Conv', 'Norm', 'Relu',
-            'ConvSum', 'Norm', 'Relu',
-            'SoftmaxLoss'
+            'Conv', 'Relu',
+            'Conv', 'Relu',
+            'Conv', 'Relu',
+            'Conv', 'Relu',
+            'Affine', 'SoftmaxLoss'
         ], params_ = [(1, 15, 15),
-            {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
-            {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
-            {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
-            {'filter_num':10, 'filter_size':3, 'pad':1, 'stride':1},
+            {'filter_num':64, 'filter_size':3, 'pad':1, 'stride':1},
+            {'filter_num':64, 'filter_size':3, 'pad':1, 'stride':1},
+            {'filter_num':64, 'filter_size':3, 'pad':1, 'stride':1},
+            {'filter_num':64, 'filter_size':3, 'pad':1, 'stride':1},
+            225
         ], dropout_ration=0.5, pooling_params={"pool_h": 2, "pool_w": 2, "stride": 2}, 
            weight_decay_lambda=0, mini_batch_size=100, saved_network_pkl=None, not0_size=4):
         
@@ -53,7 +54,7 @@ class DeepConvNet:
         
         # pkl 파일을 입력받았다면 불러오기
         if saved_network_pkl != None:
-            if self.load_params(saved_network_pkl) == False:
+            if self.load_params(saved_network_pkl, init=True) == False:
                 print("네트워크 불러오기 실패...")
                 return ImportError
             else:
@@ -151,7 +152,7 @@ class DeepConvNet:
 
             # print(feature_map_size)
         
-        # node_nums = np.array([1*3*3, 16*3*3, 16*3*3, 32*3*3, 32*3*3, 64*3*3, 64*4*4, 50, 10])
+        # # node_nums = np.array([1*3*3, 16*3*3, 16*3*3, 32*3*3, 32*3*3, 64*3*3, 64*4*4, 50, 10])
         # print("매개변수를 사용하는 레이어들의")
         # print(node_nums, "이전 노드 개수")
         # print(out_sizes, "출력 크기")
@@ -176,7 +177,6 @@ class DeepConvNet:
                     params_[idx+1]['filter_size'], params_[idx+1]['filter_size'])
                 self.params['b' + str(idx+1)] = np.zeros(params_[idx+1]['filter_num'])
                 pre_channel_num = params_[idx+1]['filter_num']
-
                 self.layers.append(Convolution(self.params['W' + str(idx+1)], self.params['b' + str(idx+1)], 
                 params_[idx+1]['stride'], params_[idx+1]['pad'], reshape_2dim= (False if 'sum' not in layer else True) ))
                 
@@ -226,9 +226,11 @@ class DeepConvNet:
                 self.layers[layer_idx].W = self.params['W' + str(i+1)]
                 self.layers[layer_idx].b = self.params['b' + str(i+1)]
 
-    def predict(self, x, train_flg=False, plot_distribution=False):
-        i = 0
-        activations = {}
+    def predict(self, x, train_flg=False, save_activation_value_distribution=False):
+        if save_activation_value_distribution:
+            i = 0
+            activation_values = {}
+
         for layer in self.layers:
             # print(layer)
             if type(layer) in (Dropout, BatchNormalization):
@@ -236,15 +238,17 @@ class DeepConvNet:
             else:
                 x = layer.forward(x)
             
-            if plot_distribution and type(layer) in (Relu, Sigmoid): # Tanh
-                activations[i] = x
+            if save_activation_value_distribution and type(layer) in (Relu, Sigmoid): # Tanh
+                activation_values[i] = x
                 i += 1
 
-        self.plot_active_value_distribution(activations) if plot_distribution else ()
-        return x
+        if not save_activation_value_distribution:
+            return x
+        else:
+            return x, activation_values
 
-    def loss(self, x, t, plot_distribution=False):
-        y = self.predict(x, train_flg=True, plot_distribution=plot_distribution)
+    def loss(self, x, t, save_activation_value_distribution=False):
+        y = self.predict(x, train_flg=True, save_activation_value_distribution=save_activation_value_distribution)
         
         weight_decay = 0
         for i, _ in enumerate(self.layer_idxs_used_params):
@@ -259,7 +263,7 @@ class DeepConvNet:
             
         return loss + weight_decay
 
-    def accuracy(self, x, t, save_wrong_idxs=False, multiple_answers=False, verbose=False, percentage=True):
+    def accuracy(self, x, t, save_wrong_idxs=False, multiple_answers=False, verbose=False, important_verbose=False, percentage=True):
         batch_size = self.mini_batch_size
         # if len(t) % batch_size != 0:
         #     print(f"\n문제 수가 미니배치 수로 나누어 떨어지지 않음\n(뒤에 남는 {len(t) % batch_size}문제는 풀지 못함)")
@@ -304,8 +308,8 @@ class DeepConvNet:
                 # acc += np.sum(y in tt_yxs)
 
             if save_wrong_idxs:
-                batch_idx = np.where(y != tt)
-                wrong_idxs = wrong_idxs + (i*batch_size+batch_idx[0]).tolist()
+                wrong_idxs_batch = np.where(y != tt)
+                wrong_idxs = wrong_idxs + (i*batch_size+wrong_idxs_batch[0]).tolist()
                 # ridxs = (i*batch_size+(np.where(y == tt))[0]).tolist()
                 # right_idxs = right_idxs + ridxs
                 # print(ridxs)
@@ -313,16 +317,16 @@ class DeepConvNet:
         if save_wrong_idxs:
             # print(len(right_idx, len(wrong_idxs)))
             # print(right_idxs)
-            if verbose:
+            if important_verbose:
                 Fnum, Qnum = len(wrong_idxs), x.shape[0]
                 print(f"\n=== 총 {Qnum}문제, 정답 {Qnum-Fnum}개, 오답 {Fnum}개 (정답률: {math.floor(acc/x.shape[0]*100*100)/100}%) ===")
             return acc / x.shape[0] * (100 if percentage else 1), wrong_idxs
         else:
             return acc / x.shape[0] * (100 if percentage else 1)
 
-    def gradient(self, x, t, plot_distribution=False):
+    def gradient(self, x, t, save_activation_value_distribution=False, save_loss=False):
         # forward
-        self.loss(x, t, plot_distribution=plot_distribution)
+        loss = self.loss(x, t, save_activation_value_distribution=save_activation_value_distribution)
 
         # backward
         dout = 1
@@ -344,7 +348,10 @@ class DeepConvNet:
                 grads['gamma' + str(i+1)] = self.layers[layer_idx+1].dgamma
                 grads['beta' + str(i+1)] = self.layers[layer_idx+1].dbeta
 
-        return grads
+        if not save_loss:
+            return grads
+        else:
+            return grads, loss
 
     def save_params(self, optimizer, lr, test_accs=[], str_data_info="", save_inside_dir=True, pkl_dir="saved_pkls"):
         
@@ -364,9 +371,9 @@ class DeepConvNet:
             if self.saved_network_pkl == None:
                 acc = "None"
             else: ### self. 빼먹음
-                acc = self.saved_network_pkl.split(" ")[-3].lstrip("acc_") # " " -> "_" 같이 수정해주어야 함
+                acc = self.saved_network_pkl.split(" ")[-6].lstrip("acc_") # " " -> "_" 같이 수정해주어야 함
         else:
-            acc = math.floor(trainer.test_accs[-1]*100)/100
+            acc = math.floor(test_accs[-1]*100)/100
         
         file_name = f"{str_data_info} acc_{acc} ln_{self.learning_num} " + \
             f"{optimizer.__class__.__name__} lr_{lr} {self.network_dir} params.pkl"
@@ -390,7 +397,11 @@ class DeepConvNet:
 
         print(f"\n네트워크 저장 성공!\n({file_name})")
 
-    def load_params(self, file_name="params.pkl", pkl_dir="saved_pkls"):
+    def load_params(self, file_name="params.pkl", pkl_dir="saved_pkls", init=False):
+        
+        if not init: # __init__함수에서만 불러오면 이 함수만 실행시킬 때는 불러올 수 없음
+            self.__init__(saved_network_pkl=file_name)
+            return 
 
         if (".pkl" not in file_name) or (file_name[-4:] != ".pkl"):
             file_name = f"{file_name}.pkl"
@@ -428,42 +439,15 @@ class DeepConvNet:
         self.weight_decay_lambda = network_infos["weight_decay_lambda"]    
         self.saved_network_pkl   = network_infos["saved_network_pkl"] 
         self.learning_num        = network_infos["learning_num"]
+        # self.loaded_params = network_infos["params"] ### 복사가 아닌 저장된 위치를 가리킴
+        # self.layers = network_infos["layers"] # pkl파일 용량이 너무 커짐
+        # self.layer_idxs_used_params = network_infos["layer_idxs_used_params"] ### 새로운 레이어들이 또 append됨
 
         params = network_infos["params"]
         for key, val in params.items():
             self.loaded_params[key] = val
-        # self.loaded_params = network_infos["params"] ### 복사가 아닌 저장된 위치를 가리킴
-        # self.layers = network_infos["layers"] # pkl파일 용량이 너무 커짐
-        # self.layer_idxs_used_params = network_infos["layer_idxs_used_params"] ### 새로운 레이어들이 또 append됨
-        
-        # print(network_infos["layers_info"], network_infos["learning_num"], network_infos["saved_network_pkl"] )
-
-        
-        # if self.mini_batch_size != network_infos["mini_batch_size"]:
-        #     print("\nError: '불러올 신경망의 미니배치 수'와 '처음 선언한 미니배치 수'가 일치하지 않는다", end=" ")
-        #     print("(앞으로 풀 문제의 수를 나누어 떨어지게 하는 것이 좋음)")
-        #     answer = input("\n어느 것을 선택하시겠습니까? 선언한 수(any)/불러온 수(1): ")
-        #     if answer == "1":
-        #         self.mini_batch_size = network_infos["mini_batch_size"] 
-        #     print("선택한 미니배치 수: ", self.mini_batch_size)
 
         print(f"\n네트워크 불러오기 성공!\n({file_name})")
-        
-        # 파일 이름에서 문제를 학습한 횟수 가져오기 (self.learning_num)
-        # name_splited = file_path.split("_")
-        # load_ln_success = False
-        # for name in name_splited:
-            # if "ln=" in name:
-            #     ln = name.lstrip("ln=")
-            #     load_ln_success = True
-        # if not load_ln_success:
-        #     print("Error: 누적 학습 횟수 가져오기 실패 (.pkl 파일 이름에 누적 학습 횟수(ln_)가 없음)")
-        # else:
-            # try:
-            #     self.learning_num = int(ln)
-            # except:
-            #     print("Error: 누적 학습 횟수 가져오기 실패 (.pkl 파일 이름에서 누적 학습 정보(ln_)가 정수형이 아님")
-
         return True
 
     def think_win_xy(self, board, whose_turn, verbose=True):
@@ -473,8 +457,8 @@ class DeepConvNet:
         scores_nomalized = ( (scores - np.min(scores)) / (scores.ptp() + 1e-7) * 100).reshape(15, 15)
         winning_odds = (softmax(scores) * 100).reshape(15, 15)
         
-        print("\n"+"="*40)
         if verbose:
+            print("\n"+"="*40)
             print("\n=== 점수(scores) ===")
             np.set_printoptions(linewidth=np.inf, formatter={'all':lambda _x: ( # 세자리 출력(100) 방지
             bcolors.according_to_score(_x) + str(int(np.minimum(_x, 99))).rjust(2) + bcolors.ENDC)})
@@ -484,15 +468,16 @@ class DeepConvNet:
             bcolors.according_to_chance(_x) + str(int(np.minimum(_x, 99))).rjust(2) + bcolors.ENDC)})
             print(winning_odds)
             np.set_printoptions()
-            
-        print("\n=== AI's Answer ===")
-        print_board(board, winning_odds, mode="QnAI")
+        
+            print("\n=== AI's Answer ===")
+            print_board(board, winning_odds, mode="QnAI")
         
         is_foul = True
         while is_foul:
             foul = isFoul(x, y, board, whose_turn)
             chance = "%.2f"% (math.floor(winning_odds[y, x]*100)/100) ### % ()
-            print(f"구한 좌표: x={str(x).rjust(2)}, y={str(y).rjust(2)} ({chance}%) foul: {foul}")
+            if verbose: 
+                print(f"구한 좌표: x={str(x).rjust(2)}, y={str(y).rjust(2)} ({chance}%) foul: {foul}")
             if foul == "No":
                 is_foul = False
             else:
@@ -500,15 +485,4 @@ class DeepConvNet:
                 x, y = scores_nomalized.argmax()%15, scores_nomalized.argmax()//15
         return x, y
 
-    def plot_active_value_distribution(self, activations):
-        plt.figure(figsize=(3*len(activations),5))
-        plt.subplots_adjust(left=0.05, right=0.98, wspace=0.3)
-        
-        for i, a in activations.items():
-            plt.subplot(1, len(activations), i+1)
-            plt.title(str(i+1) + "-activation")
-            # if i != 0: plt.yticks([], [])
-            plt.xlim(0, 1)
-            plt.hist(a.flatten(), 30, range=(0,1))
-            
-        plt.show()
+

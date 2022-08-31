@@ -62,9 +62,9 @@ if train_network:
     else:
         print("저장 안했다^^")
     
-    plot.loss_graph(trainer.train_losses, smooth=False)
-    plot.loss_graph(trainer.train_losses, smooth=True)
-    plot.accuracy_graph(trainer.train_accs, trainer.test_accs)
+    # plot.loss_graph(trainer.train_losses, smooth=False)
+    # plot.loss_graph(trainer.train_losses, smooth=True)
+    # plot.accuracy_graph(trainer.train_accs, trainer.test_accs)
 
 # 정확도 구하고, 맞은 or 틀린 문제 확인, 테스트
 # accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True, verbose=True) # , multiple_answers=True
@@ -76,20 +76,29 @@ if train_network:
 # params0 = {} ### 복사 안하고 가리키면 가리킨 곳이 바뀔때 같이 변해버림
 # for key, value in network.params.items():
 #     params0[key] = value
-# network.load_params("4to5, 3to4 (2) acc_99.97 ln_48000 Adam2 lr_0.01 CR_CR_CR_CsumR_Smloss params")
-# plot.all_filters_compare(params0, network.params)
+# network.load_params("training with myAI (1) acc_None ln_100010 Adam lr_0.01 CR_CR_CR_CR_A_Smloss params")
+# plot.all_filters_compare(params0, network.params, nx=16)
 
-# # 각 pkl별 정확도 비교
-# pkls_name = [
-    # "Adagrad lr_0.01 ln_14300 loss_7.1348",
-    # "Adagrad lr_0.01 ln_28600 loss_13.4896",
-    # "Adagrad lr_0.01 ln_42900 loss_16.0961",
-    # "Adagrad lr_0.01 ln_57200 loss_16.1181",
-    # ]
-# for i in range(4):
-    # network.load_params(pkls_name[i])
-    # accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True)
-    # print(f"accuracy: {accuracy}%")
+# # 각 pkl별 정확도, 활성화 값 분포 비교
+pkls_name = [
+    # "4to5, 3to4 (2) acc_99.97 ln_48000 Adam2 lr_0.01 CR_CR_CR_CsumR_Smloss params",
+    # "training with myAI acc_99.97 ln_65000 Adam lr_0.01 CR_CR_CR_CsumR_Smloss params",
+    
+    # "Adam1 lr_0.01 ln_85800 acc_59.86 CR_CR_CR_CR_ANR_ASmloss params" # 
+
+    # "training with myAI (1) acc_None ln_105075 Adam lr_0.01 CR_CR_CR_CR_ANR_A_Smloss params",
+
+    "with myAI's (x8) acc_None ln_100000 Adam lr_0.01 CR_CR_CR_CR_A_Smloss params",
+]
+activation_values_list = []
+
+for i in range(len(pkls_name)):
+    network.load_params(file_name=pkls_name[i])
+    accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True, important_verbose=True)
+    _, activation_values = network.predict(x_datas[:500], save_activation_value_distribution=True)
+    activation_values_list.append(activation_values)
+    
+plot.compare_activation_value_distribution(activation_values_list, learning_num_per_=20000, ylim=200000)
 
 # # 손실 함수가 높아지는 이유: 답이 2개이기 때문에 softmax확률이 5:5로 분배됨, 임의로 정답 라벨을 수정해버려서
 # from modules.common.functions import softmax, cross_entropy_error
@@ -98,7 +107,7 @@ if train_network:
 # idx, num = 0, 2000
 # x, t = x_datas[idx:idx+num], t_datas[idx:idx+num]
 
-# y0 = network.predict(x, plot_activations=True)
+# y0 = network.predict(x, plot_distribution=True)
 # # y = softmax(y0)
 # # loss = cross_entropy_error(y, t)
 

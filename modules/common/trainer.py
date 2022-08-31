@@ -123,7 +123,10 @@ class Trainer:
     def save_graph_datas(self, network, str_data_info, save_inside_dir=True, pkl_dir="saved_pkls"):
         
         if len(self.test_accs) == 0:
-            acc = network.saved_network_pkl.split(" ")[-3].lstrip("acc_")
+            if network.saved_network_pkl == None:
+                acc = "None"
+            else:
+                acc = network.saved_network_pkl.split(" ")[-6].lstrip("acc_")
         else:
             acc = math.floor(self.test_accs[-1]*100)/100
         file_name = f"{str_data_info} acc_{acc} ln_{network.learning_num} " + \
