@@ -1,7 +1,7 @@
 # coding: utf-8
 import numpy as np
 import sys
-import time as t
+import time as base_time
 
 def smooth_curve(x):
     """損失関数のグラフを滑らかにするために用いる
@@ -99,25 +99,43 @@ def col2im(col, input_shape, filter_h, filter_w, stride=1, pad=0):
     return img[:, :, pad:H + pad, pad:W + pad]
 
 
-class time:
+class time():
+    
+    def time() -> float:
+        return base_time.time()
+
+    def sleep(secs: float) -> None:
+        base_time.sleep(secs)
 
     def sec_to_hms(second):
         second = int(second)
         h, m, s = (second // 3600), (second//60 - second//3600*60), (second % 60)
         return h, m, s
     
-    def str_hms_delta(start_time):
-        time_delta = t.time() - start_time
+    def str_hms_delta(start_time, hms=False, rjust=False, join=':'):
+        time_delta = base_time.time() - start_time
         h, m, s = time.sec_to_hms(time_delta)
-        return str(f"{h}h {m}m {s}s")
+        if not hms:
+            return "{1}{0}{2:02d}{0}{3:02d}".format(join, h, m, s)
+        elif rjust: 
+            m, s = str(m).rjust(2), str(s).rjust(2)
+        
+        return str(f"{h}h{join}{m}m{join}{s}s")
 
-    def str_hms(second):
+    def str_hms(second, hms=False, rjust=False, join=':'):
         h, m, s = time.sec_to_hms(second)
-        return str(f"{h}h {m}m {s}s")
+        if not hms:
+            return "{1}{0}{2:02d}{0}{3:02d}".format(join, h, m, s)
+        elif rjust: 
+            m, s = str(m).rjust(2), str(s).rjust(2)
+        
+        return str(f"{h}h{join}{m}m{join}{s}s")
 
-import datetime as dt
-from selenium import webdriver
+
 def Alerm(webdriver_path=r'C:\Users\danal\Documents\programing\chromedriver.exe', loading_sec=7):
+    import datetime as dt
+    from selenium import webdriver
+    
     now = dt.datetime.today()
 
     if int(now.strftime('%S')) < 60 - loading_sec:
@@ -217,3 +235,78 @@ def __get_logger():
     return __logger
 
 
+def rotate_2dim_array(arr, d, add_0dim=True): # 2차원 배열을 90도 단위로 회전해 반환한다. 
+    # 이때 원 배열은 유지되며, 새로운 배열이 탄생한다. 
+    # 이는 회전이 360도 단위일 때도 해당한다. 
+    # 2차원 배열은 행과 열의 수가 같은 정방형 배열이어야 한다.
+    # arr: 회전하고자 하는 2차원 배열. 입력이 정방형 행렬이라고 가정한다. 
+    # d: 90도씩의 회전 단위. -1: -90도, 1: 90도, 2: 180도, ...
+
+    size = len(arr)
+    ret = np.array([ [0]*size for _ in range(size) ])
+    N = size - 1
+    if d % 8 not in (1, 2, 3, 4, 5, 6, 7): 
+        for r in range(size): 
+            for c in range(size): 
+                ret[r][c] = arr[r][c] 
+    elif d % 8 == 1:
+        for r in range(size): 
+            for c in range(size): 
+                ret[c][N-r] = arr[r][c] 
+    elif d % 8 == 2: 
+        for r in range(size): 
+            for c in range(size): 
+                ret[N-r][N-c] = arr[r][c] 
+    elif d % 8 == 3: 
+        for r in range(size): 
+            for c in range(size): 
+                ret[N-c][r] = arr[r][c] 
+
+    elif d % 8 == 4:
+        for r in range(size): 
+            for c in range(size): 
+                ret[r][N-c] = arr[r][c]
+    elif d % 8 == 5: # arr.T
+        for r in range(size): 
+            for c in range(size): 
+                ret[N-c][N-r] = arr[r][c]
+    elif d % 8 == 6:
+        for r in range(size): 
+            for c in range(size): 
+                ret[N-r][c] = arr[r][c]
+    elif d % 8 == 7:
+        for r in range(size): 
+            for c in range(size): 
+                ret[c][r] = arr[r][c]
+
+    if not add_0dim:
+        return ret
+    else:
+        return ret.reshape(1, size, size)
+
+def rotate_2dim_array_idx(dim2_arr_idx, d, size=15, add_0dim=True):
+    x, y = dim2_arr_idx % size, dim2_arr_idx // size
+    N = size -1
+
+    if d % 8 not in (1, 2, 3, 4, 5, 6, 7): 
+        pass
+    elif d % 8 == 1:
+        x, y = N-y, x
+    elif d % 8 == 2:
+        x, y = N-x, N-y
+    elif d % 8 == 3:
+        x, y = y, N-x
+
+    elif d % 8 == 4:
+        x, y = N-x, y
+    elif d % 8 == 5: # arr.T
+        x, y = N-y, N-x
+    elif d % 8 == 6:
+        x, y = x, N-y
+    elif d % 8 == 7:
+        x, y = y, x
+
+    if not add_0dim:
+        return y*15 + x
+    else:
+        return np.array([[y*15 + x]])

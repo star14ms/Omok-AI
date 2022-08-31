@@ -119,13 +119,18 @@ c, d = dic.values()
 print(c, d)
 print(len(dic))
 
-line("np.array sum, argmax")
+line("np.array sum, argmax, where")
 
 a = np.array([[1, 2, 6], 
               [3, 4, 5]], dtype=int)
 print(a.sum(), sum(a)) # axis=0
 print(a.argmax())
 print((a * 0.5).dtype)
+
+a = [1, -1, 1]
+print(len(np.where(np.array(a)==1)[0]))
+print(sum(np.array(a)==1))
+
 line()
 
 a, b = 1, 2
@@ -213,3 +218,76 @@ a = np.array([1, 2])
 b = a.copy()
 a[0] = 3
 print(a, b)
+
+line("2차원 배열 회전하기")
+
+def rotate_2dim_array(arr, d): # 2차원 배열을 90도 단위로 회전해 반환한다. 
+    # 이때 원 배열은 유지되며, 새로운 배열이 탄생한다. 
+    # 이는 회전이 360도 단위일 때도 해당한다. 
+    # 2차원 배열은 행과 열의 수가 같은 정방형 배열이어야 한다.
+    # arr: 회전하고자 하는 2차원 배열. 입력이 정방형 행렬이라고 가정한다. 
+    # d: 90도씩의 회전 단위. -1: -90도, 1: 90도, 2: 180도, ...
+
+    size = len(arr)
+    ret = np.array([ [0]*size for _ in range(size) ])
+    N = size - 1
+    if d % 8 not in (1, 2, 3, 4, 5, 6, 7): 
+        for r in range(size): 
+            for c in range(size): 
+                ret[r][c] = arr[r][c] 
+    elif d % 8 == 1:
+        for r in range(size): 
+            for c in range(size): 
+                ret[c][N-r] = arr[r][c] 
+    elif d % 8 == 2: 
+        for r in range(size): 
+            for c in range(size): 
+                ret[N-r][N-c] = arr[r][c] 
+    elif d % 8 == 3: 
+        for r in range(size): 
+            for c in range(size): 
+                ret[N-c][r] = arr[r][c] 
+
+    elif d % 8 == 4:
+        for r in range(size): 
+            for c in range(size): 
+                ret[r][N-c] = arr[r][c]
+    elif d % 8 == 5: # arr.T
+        for r in range(size): 
+            for c in range(size): 
+                ret[N-c][N-r] = arr[r][c]
+    elif d % 8 == 6:
+        for r in range(size): 
+            for c in range(size): 
+                ret[N-r][c] = arr[r][c]
+    elif d % 8 == 7:
+        for r in range(size): 
+            for c in range(size): 
+                ret[c][r] = arr[r][c]
+    
+    return ret.reshape(1, size, size)
+
+arrs = np.array(
+  [
+   [[1, 2, 3], 
+    [4, 5, 6], 
+    [7, 8, 9]],
+   [[-1, -2, -3],
+    [-4, -5, -6],
+    [-7, -8, -9]]
+  ])
+arrs_shape = arrs.shape
+print(arrs_shape)
+for arr in arrs: 
+    for d in range(1, 8): # -7~0 = 0~7
+        arrs = np.append(arrs, rotate_2dim_array(arr, d), axis=0)
+        # print(rotate_2dim_array(arr, d), d)
+
+print(arrs_shape)
+print(arrs.shape)
+# print(arrs)
+
+line("리스트")
+xy_molds = [[7+i, 7+j] for i in range(-2, 3, 1) for j in range(-2, 3, 1)]
+print(xy_molds)
+

@@ -5,6 +5,7 @@ from modules.common.functions import softmax, cross_entropy_error
 from modules.common.util import bcolors
 import random
 import math
+from modules.make_datas import _change_one_hot_label
 
 def first_place_yx(array, find_all=False):
     if not find_all: # return y, x
@@ -58,6 +59,8 @@ def print_board(*args, mode="QnAI", num_answers=1):
     
     if (mode=="QnA" or mode=="QnAI" or mode=="QnA_AI"):
         if A.shape[0] == 1:
+            if len(A.shape) == 1:
+                A = _change_one_hot_label(A)
             A = A.reshape(15, 15)
         a_y, a_x = A.argmax()//15, A.argmax()%15
     

@@ -1,7 +1,6 @@
 from modules.make_datas import board_datas as bd
 from network import DeepConvNet
 from modules.common.trainer import Trainer
-import time as t
 import numpy as np
 from modules.common.util import time, Alerm
 from modules.plot import plot
@@ -71,7 +70,7 @@ def print_learning_info(str_lr, str_wd, val_accs, attempts_number, isgiveup):
 
 print(f"trial:{optimization_trial}, attempts:{attempts_number}, epochs:{epochs}")
 print("\n탐색 시작!!")
-start_time = t.time()
+start_time = time.time()
 first_trial = True
 
 # 매개변수 최적화 방법과 학습률에 따른 딥러닝 효율 비교
@@ -103,7 +102,7 @@ for optimizer in optimizers:
         
         if first_trial:
             first_trial = False
-            first_trial_time = int(t.time() - start_time)
+            first_trial_time = int(time.time() - start_time)
             estimated_time = first_trial_time * optimization_trial * attempts_number * len(optimizers)
             print(f"예상 소요 시간: {time.str_hms(estimated_time)}")
         if i == 0: 
