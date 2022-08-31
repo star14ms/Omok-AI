@@ -2,7 +2,7 @@ import numpy as np
 from network import DeepConvNet
 from modules.common.trainer import Trainer
 from modules.make_datas import board_datas as bd
-import time
+from modules.common.util import time
 from modules.plot import *
 from modules.test import print_board, test
 
@@ -43,7 +43,7 @@ if train_network:
     print("\n학습 시작!")
     start = time.time()
     trainer.train()
-    print(str_hms_delta(start)) # 소요 시간 출력
+    print(time.str_hms_delta(start)) # 소요 시간 출력
 
 # network.save_params(trainer.optimizer, trainer.optimizer.lr, str_data_info, verbose=True)
 # save_graph_datas(graph_datas, network, trainer.optimizer, trainer.optimizer.lr, str_data_info)
@@ -100,7 +100,7 @@ for i in range(len(pkls_name)):
     accuracy, wrong_idxs = network.accuracy(x_datas, t_datas, save_wrong_idxs=True, important_verbose=True, verbose=False)
     _, activation_values = network.predict(x_datas[:100], save_activation_value_distribution=True)
     activation_values_list.append(activation_values)
-    print(plot.str_hms_delta(start))
+    print(time.str_hms_delta(start))
     
 plot.compare_activation_value_distribution(activation_values_list, pkls_name, ylim=20000)
 

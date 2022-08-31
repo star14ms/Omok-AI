@@ -13,7 +13,6 @@ from modules.Yixin import * # Yixin
 from network import DeepConvNet
 from modules.common.optimizer import *
 from modules.make_datas import _change_one_hot_label
-import time as t # 트레이닝 돌 두는 시간 텀
 from modules.common.util import time
 
 # saved_network_pkl = "with_myAI (x8x26) ln_1023800 acc_None Adam lr_0.01 CR_CR_CR_CR_A_Smloss params"
@@ -55,7 +54,7 @@ train_losses = []
 
 x_datas_left = np.empty((0, 15, 15), dtype=np.float16)
 t_datas_left = np.empty((0, 1), dtype=int)
-start_time = t.time()
+start_time = time.time()
 
 while not exit:
 

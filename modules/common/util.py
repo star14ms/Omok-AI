@@ -1,7 +1,7 @@
 # coding: utf-8
 import numpy as np
 import sys
-import time as t
+import time as base_time
 
 def smooth_curve(x):
     """損失関数のグラフを滑らかにするために用いる
@@ -99,7 +99,13 @@ def col2im(col, input_shape, filter_h, filter_w, stride=1, pad=0):
     return img[:, :, pad:H + pad, pad:W + pad]
 
 
-class time:
+class time():
+    
+    def time() -> float:
+        return base_time.time()
+
+    def sleep(secs: float) -> None:
+        base_time.sleep(secs)
 
     def sec_to_hms(second):
         second = int(second)
@@ -107,7 +113,7 @@ class time:
         return h, m, s
     
     def str_hms_delta(start_time, hms=False, rjust=False, join=':'):
-        time_delta = t.time() - start_time
+        time_delta = base_time.time() - start_time
         h, m, s = time.sec_to_hms(time_delta)
         if not hms:
             return "{1}{0}{2:02d}{0}{3:02d}".format(join, h, m, s)
@@ -125,9 +131,11 @@ class time:
         
         return str(f"{h}h{join}{m}m{join}{s}s")
 
-import datetime as dt
-from selenium import webdriver
+
 def Alerm(webdriver_path=r'C:\Users\danal\Documents\programing\chromedriver.exe', loading_sec=7):
+    import datetime as dt
+    from selenium import webdriver
+    
     now = dt.datetime.today()
 
     if int(now.strftime('%S')) < 60 - loading_sec:
