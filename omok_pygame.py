@@ -189,7 +189,9 @@ class Omok_Pygame():
                     # 선택한 좌표에 돌 두기
                     self.place(x, y)
                     self.turn_end_phase(x, y)
-                    self.screen_bilt()
+
+                    # 화면 업데이트
+                    self.screen_blit()
                     pygame.display.update()
                         
 
@@ -252,9 +254,9 @@ class Omok_Pygame():
                                             self.black_foul = False
         
                                             # 바둑알, 커서 위치 표시, 마지막 돌 표시 화면에 추가
-                                            self.screen_bilt_board()
+                                            self.screen_blit_board()
                                             screen.blit(images.get('select'),(self.x_win,self.y_win))
-                                            self.screen_bilt_last_stone([self.last_stone_xy[1], self.last_stone_xy[0]])
+                                            self.screen_blit_last_stone()
                                             pygame.display.update()
                                             continue
                                         else:
@@ -315,7 +317,7 @@ class Omok_Pygame():
                                 Sound.play(sounds.get('바둑알 꺼내기'))
                                 self.turn -= 1
                                 self.board[self.record[self.turn][0], self.record[self.turn][1]] = 0
-                                self.last_stone_xy = [self.record[self.turn-1][0], self.record[self.turn-1][1]] # self.last_stone_xy : 돌의 마지막 위치
+                                self.last_stone_xy = [self.record[self.turn-1][1], self.record[self.turn-1][0]] # self.last_stone_xy : 돌의 마지막 위치
                         elif event.key == pygame.K_RIGHT:
                             if not self.game_review:
                                 if self.x_win+self.dis < window_high + window_num - self.dis:
@@ -327,7 +329,7 @@ class Omok_Pygame():
                                 Sound.play(sounds.get('바둑알 놓기'))
                                 self.turn += 1
                                 self.board[self.record[self.turn-1][0], self.record[self.turn-1][1]] = self.record[self.turn-1][2]
-                                self.last_stone_xy = [self.record[self.turn-1][0], self.record[self.turn-1][1]]
+                                self.last_stone_xy = [self.record[self.turn-1][1], self.record[self.turn-1][0]]
                         
                         # 기타 키
                         elif event.key == pygame.K_F1: # 바둑돌 지우기
@@ -335,11 +337,11 @@ class Omok_Pygame():
                             self.board[y][x]=0
                         elif event.key == pygame.K_F2: # 검은 바둑돌
                             self.board[y][x]=1
-                            self.last_stone_xy = [y,x]
+                            self.last_stone_xy = [x, y]
                             Sound.play(sounds.get('바둑알 놓기'))
                         elif event.key == pygame.K_F3: # 흰 바둑돌
                             self.board[y][x]=-1
-                            self.last_stone_xy = [y,x]
+                            self.last_stone_xy = [x, y]
                             Sound.play(sounds.get('바둑알 놓기'))
                         elif event.key == pygame.K_F4: # 커서 현재 위치 출력
                             print("커서 위치:", x, y) # 컴퓨터: 0부터 셈, 사람: 1부터 셈 -> +1 
@@ -366,7 +368,7 @@ class Omok_Pygame():
                             self.game_end=True             
         
                         # 화면 업데이트
-                        self.screen_bilt()
+                        self.screen_blit()
                         pygame.display.update()
         
                     # 창 닫기(X) 버튼을 클릭했을 때
@@ -383,7 +385,7 @@ class Omok_Pygame():
         self.board[y][x] = self.whose_turn
         
         self.record.append([y, x, self.whose_turn])
-        self.last_stone_xy = [y, x]
+        self.last_stone_xy = [x, y]
         self.turn += 1
         
         self.x_win = 28 + self.dis*x # 커서 이동
@@ -470,10 +472,10 @@ class Omok_Pygame():
         
             if self.turn == 0:
                 x1, y1 = 7, 7
-            elif self.train_with_Yixin and self.turn >= 3: # 알파오 Yixin (백)
+            elif self.train_with_Yixin and self.turn >= 3: # 알파오 Yixin
                 x1, y1 = Yixin.think_win_xy(self.whose_turn, undo=True if self.whose_turn == 1 else False)
                 # print(f"{X_line[x1]}{Y_line[y1]} Yixin" if x1!=None else None)
-            if not self.train_with_Yixin or x1==None or self.turn < 3: # 알고리즘 AI (백)
+            if not self.train_with_Yixin or x1==None or self.turn < 3: # 알고리즘 AI
                 x1, y1 = AI_think_win_xy(self.whose_turn, self.board, all_molds=True, verbose=False)
                 # print(f"{X_line[x1]}{Y_line[y1]} myAI")
                 if self.train_with_Yixin and self.turn == 2: Yixin.Click_setting("plays_w")
@@ -491,7 +493,7 @@ class Omok_Pygame():
                     Yixin.Click_setting("plays_b")
                     Yixin.Click_setting("plays_w")
                     Click(0, 0) # 다음 흑이 둘 수 미리 생각하기 (Yixin)
-            else: # 딥러닝 신경망 AI (흑)
+            else: # 딥러닝 신경망 AI
                 x2, y2 = self.AI.network.think_win_xy(self.board, self.whose_turn, verbose=self.verbose)
                 x, y = x2, y2
                 if self.train_with_Yixin: Click(x2, y2, board_xy=True)
@@ -528,7 +530,7 @@ class Omok_Pygame():
                 self.whose_turn *= -1
         
                 if self.turn < self.max_turn: 
-                    self.last_stone_xy = [y, x] # 마지막 놓은 자리 표시
+                    self.last_stone_xy = [x, y] # 마지막 놓은 자리 표시
                 else:
                     self.clean_board_num += 1
                     self.turn = 0
@@ -538,11 +540,11 @@ class Omok_Pygame():
         if not self.exit:
             if self.mute:
                 screen.blit(images.get('mute_img'),(355, 705))
-            self.screen_bilt_board()
+            self.screen_blit_board()
             screen.blit(images.get('select'),(self.x_win,self.y_win))
             screen.blit(texts.get('AI_is_training_text'),(10, 705))
             if self.turn != 0: # or event.key == pygame.K_F2 or event.key == pygame.K_F3
-                self.screen_bilt_last_stone([self.last_stone_xy[1], self.last_stone_xy[0]])
+                self.screen_blit_last_stone()
             if self.game_mode=="AI_vs_AI":
                 screen.blit(texts.get('AI_vs_AI_mode'),(520, 705))
         
@@ -608,7 +610,7 @@ class Omok_Pygame():
             self.whose_turn *= -1
             
             if self.turn < self.max_turn: ### <= -> <
-                self.last_stone_xy = [y, x] # 마지막 놓은 자리 표시
+                self.last_stone_xy = [x, y] # 마지막 놓은 자리 표시
             else:
                 self.turn = 0
                 self.board = np.zeros([self.size, self.size])
@@ -633,7 +635,7 @@ class Omok_Pygame():
                 print("백 승리!")
         
 
-    def screen_bilt_board(self): # 바둑알 표시하기
+    def screen_blit_board(self): # 바둑알 표시하기
         size = self.size
         screen = self.screen
         black_stone = self.images.get('black_stone')
@@ -647,12 +649,13 @@ class Omok_Pygame():
                     screen.blit(white_stone,(625-18+(b-7)*self.dis-250,375-19+(a-7)*self.dis)) ## 18.75 -> 19
 
 
-    def screen_bilt_last_stone(self, xy): # 마지막 돌 위치 표시하기
-        dest = (625-18+(xy[0]-7)*self.dis-250, 375-19+(xy[1]-7)*self.dis)
+    def screen_blit_last_stone(self): # 마지막 돌 위치 표시하기
+        last_x, last_y = self.last_stone_xy
+        dest = (625-18+(last_x-7)*self.dis-250, 375-19+(last_y-7)*self.dis)
         self.screen.blit(self.images.get('last_sign1'), dest) ## 18.75 -> 19
 
 
-    def screen_bilt(self):
+    def screen_blit(self):
         screen = self.screen
         images = self.images
         texts = self.texts
@@ -661,13 +664,13 @@ class Omok_Pygame():
         if not self.exit:
             if self.mute:
                 screen.blit(images.get('mute_img'),(355, 705))
-            self.screen_bilt_board()
+            self.screen_blit_board()
             if self.training_mode:
                 screen.blit(texts.get('AI_is_training_text'),(10, 705))
             if not self.game_review:
                 screen.blit(images.get('select'),(self.x_win,self.y_win))
             if self.turn != 0: # or event.key == pygame.K_F2 or event.key == pygame.K_F3
-                self.screen_bilt_last_stone([self.last_stone_xy[1], self.last_stone_xy[0]])
+                self.screen_blit_last_stone()
             if self.game_mode=="AI_vs_AI":
                 screen.blit(texts.get('AI_vs_AI_mode'),(520, 705))
 
