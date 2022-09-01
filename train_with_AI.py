@@ -7,7 +7,7 @@ from modules.plot import *
 # AI code (Human Made Algorithm)
 from pygame_src.AI_code import *
 from pygame_src.foul_detection import isFive
-from modules.Yixin import * # Yixin
+from modules.yixin import Yixin, Click
 
 # AI Deep Learning network
 from network import DeepConvNet

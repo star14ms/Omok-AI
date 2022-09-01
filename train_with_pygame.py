@@ -8,7 +8,7 @@ from modules.plot import *
 # AI code (Human Made Algorithm)
 from pygame_src.AI_code import *
 from pygame_src.foul_detection import isFive, num_Four, num_Three
-from modules.Yixin import * # Yixin
+from modules.yixin import Yixin, Click
 
 # AI Deep Learning network
 from network import DeepConvNet
@@ -160,12 +160,8 @@ while not exit:
     AI_mode = "Deep_Learning"
 
     game_end = False # 게임 후 수순 다시보기 모드까지 끝났나?
-    black_win = None # 흑,백 승패 여부
     game_over = False # 게임이 끝났나?
     game_review = False # 수순 다시보기 모드인가?
-
-    waiting_time = 0
-    waiting_game_end = False
 
     record = [] # 기보 기록할 곳
     x_datas = np.empty((0, 15, 15), dtype=np.float16)
@@ -177,9 +173,6 @@ while not exit:
     before_foul = False # 한 수 전에 금수를 뒀나?
     stubborn_foul = "No" # 방향키를 움직이지 않고 또 금수를 두었나? (그랬을 때 금수 종류) (금수자리를 연타했나)
     foul_n_mok = 0 # 연속 금수 횟수
-    threethree_foul = False
-    fourfour_foul = False
-    six_foul = False
 
     x=7 # 커서 좌표
     y=7
@@ -262,8 +255,7 @@ while not exit:
         screen.blit(board_img,(window_num, 0)) ## screen.fill(0) : 검은 화면
         
         # 트레이닝 모드일 때
-        if training_mode: # and time.time()-waiting_time > 0.1
-            # waiting_time = time.time()
+        if training_mode:
 
             # AI가 두기
             if not game_over:
@@ -430,22 +422,22 @@ while not exit:
             # 화면 업데이트
             pygame.display.update()
 
-        for event in pygame.event.get():
-            if event.type==pygame.QUIT:
-                exit=True
-                game_end=True 
+            for event in pygame.event.get():
+                if event.type==pygame.QUIT:
+                    exit=True
+                    game_end=True 
 
-            if event.type == pygame.KEYDOWN:
+                if event.type == pygame.KEYDOWN:
 
-                if event.key == pygame.K_m: # 음소거
-                    if not mute:
-                        mute = True
-                        pygame.mixer.music.pause()
-                    else:
-                        mute = False
-                        pygame.mixer.music.unpause()
-                         
-        continue # 트레이닝 중일때 나머지 아래 코드 무시
+                    if event.key == pygame.K_m: # 음소거
+                        if not mute:
+                            mute = True
+                            pygame.mixer.music.pause()
+                        else:
+                            mute = False
+                            pygame.mixer.music.unpause()
+
+            continue
 
         # 입력 받기
         for event in pygame.event.get():
@@ -554,12 +546,10 @@ while not exit:
                             pygame.mixer.Sound.play(sound4)
     
                             if whose_turn == 1 and not black_foul:
-                                black_win=True
                                 # if game_mode=="Human_vs_AI":
                                     # pygame.mixer.Sound.play(AI_lose)
                                 print("흑 승리!")
                             else:
-                                black_win=False
                                 if not black_foul:
                                     print("백 승리!")
                         # print(difference_score_board(whose_turn, size, board), "\n") #print

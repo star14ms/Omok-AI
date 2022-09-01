@@ -357,6 +357,22 @@ class DeepConvNet:
         else:
             return grads, loss
 
+    def create_file_name(self, optimizer, lr, str_data_info, test_accs):
+        
+        if len(test_accs) == 0:
+            if self.saved_network_pkl == None:
+                acc = "None"
+            else: ### self. 빼먹음
+                acc = self.saved_network_pkl.split(" ")[-5].lstrip("acc_") # " " -> "_" 같이 수정해주어야 함
+        else:
+            acc = math.floor(test_accs[-1]*100)/100
+        
+        file_name = f"{str_data_info} ln_{self.learning_num} acc_{acc} " + \
+            f"{optimizer.__class__.__name__} lr_{lr} {self.network_dir} params.pkl"
+
+        return file_name
+
+        
     def save_params(self, optimizer, lr, str_data_info="", test_accs=[], save_inside_dir=True, pkl_dir="saved_pkls", verbose=True):
         
         save_params = {}
@@ -376,21 +392,14 @@ class DeepConvNet:
         # self.network_infos["layers"] = self.layers # pkl파일 용량이 너무 커짐 (이미 layers_info가 있으니 똑같이 다신 만들 수 있음)
         # self.network_infos["layer_idxs_used_params"] = self.layer_idxs_used_params  ### 새로운 레이어들이 또 append됨
         # print(self.saved_network_pkl)
-        if len(test_accs) == 0:
-            if self.saved_network_pkl == None:
-                acc = "None"
-            else: ### self. 빼먹음
-                acc = self.saved_network_pkl.split(" ")[-5].lstrip("acc_") # " " -> "_" 같이 수정해주어야 함
-        else:
-            acc = math.floor(test_accs[-1]*100)/100
-        
-        file_name = f"{str_data_info} ln_{self.learning_num} acc_{acc} " + \
-            f"{optimizer.__class__.__name__} lr_{lr} {self.network_dir} params.pkl"
-        file_path = file_name
-        
+
+        file_name = self.create_file_name(optimizer, lr, str_data_info, test_accs)
+
         if save_inside_dir: ### if save_inside_dir: 안에 선언이 있으면 선언되지 않을 수 있음
-            file_path = f"{pkl_dir}/{self.network_dir}/" + file_path
-        
+            file_path = f"{pkl_dir}/{self.network_dir}/" + file_name
+        else:
+            file_path = file_name
+
         if not os.path.exists(f"{pkl_dir}/{self.network_dir}"):
             os.makedirs(f"{pkl_dir}/{self.network_dir}")
             print(f"{pkl_dir}/{self.network_dir} 폴더 생성")
