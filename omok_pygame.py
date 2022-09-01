@@ -1,5 +1,7 @@
 import numpy as np # 보드 만들기
 import pygame # 게임 화면 만들기
+from pygame.mixer import Sound
+
 from datetime import datetime # 기보 날짜 기록
 from modules.plot import *
 
@@ -10,6 +12,10 @@ from modules.yixin import Yixin, Click
 
 # AI Deep Learning network
 from omok_tool import Omok_AI
+
+
+def img_load(filename, size):
+    return pygame.transform.scale(pygame.image.load(filename), size)
 
 
 class Omok_Pygame():
@@ -23,83 +29,85 @@ class Omok_Pygame():
         window_high=250*3
         self.window_high = window_high
         self.window_num=0
-        self.screen=pygame.display.set_mode((window_length,window_high))
-        pygame.display.set_caption("이걸 보다니 정말 대단해!") # 제목
-        
-        board_img=pygame.image.load("pygame_src\img\game_board.png")
-        self.board_img=pygame.transform.scale(board_img,(window_high,window_high))
         self.size=15 # 바둑판 좌표 범위
         self.dis=47 # 바둑판 이미지에서 격자 사이의 거리
-        
-        win_black=pygame.image.load("pygame_src\img\win_black.png")
-        self.win_black=pygame.transform.scale(win_black,(int(300*2.5),300))
-        
-        win_white=pygame.image.load("pygame_src\img\win_white.png")
-        self.win_white=pygame.transform.scale(win_white,(int(300*2.5),300))
-        
-        select=pygame.image.load("pygame_src\img\select2.png")
-        self.select=pygame.transform.scale(select,(int(45*5/6),int(45*5/6)))
-        
-        last_sign1=pygame.image.load("pygame_src\img\last_sign1.png")
-        self.last_sign1=pygame.transform.scale(last_sign1,(int(45*5/6),int(45*5/6)))
-        
-        # last_sign2=pygame.image.load("pygame_src\img\last_sign2.png")
-        # last_sign2=pygame.transform.scale(last_sign2,(int(45*5/6),int(45*5/6)))
-        
-        black_stone=pygame.image.load("pygame_src\img\wblack_stone.png")
-        self.black_stone=pygame.transform.scale(black_stone,(int(45*5/6),int(45*5/6)))
-        
-        white_stone=pygame.image.load("pygame_src\img\white_stone.png")
-        self.white_stone=pygame.transform.scale(white_stone,(int(45*5/6),int(45*5/6)))
-        
-        # my_rect1 = pygame.Rect(0,0,window_num,window_high)
-        # your_rect1 =  pygame.Rect(window_length-window_num,0,window_length,window_high)
-        
-        play_button=pygame.image.load("pygame_src\img\play_button.png")
-        self.play_button=pygame.transform.scale(play_button,(250*2+14,250*1))
-        
-        play_button2=pygame.image.load("pygame_src\img\play_button2.png")
-        self.play_button2=pygame.transform.scale(play_button2,(250*2,250*1))
-        
-        selected_button=pygame.image.load("pygame_src\img\selected_button.png")
-        self.selected_button=pygame.transform.scale(selected_button,(250*2+14,250*1))
-        
-        selected_button2=pygame.image.load("pygame_src\img\selected_button2.png")
-        self.selected_button2=pygame.transform.scale(selected_button2,(250*2,250*1))
-        
-        mute_img=pygame.image.load("pygame_src\img\mute.png")
-        self.mute_img=pygame.transform.scale(mute_img,(40, 40))
-        
+
+        self.screen=pygame.display.set_mode((window_length, window_high))
+        pygame.display.set_caption("이걸 보다니 정말 대단해!") # 제목
+
+        self.load_source(window_length, window_high)
+
+
+    def load_source(self, winow_length, window_high):
+        self._load_images(winow_length, window_high)
+        self._load_sonuds()
+        self._load_texts()
+
+
+    def _load_images(self, winow_length, window_high, path='pygame_src\img'):
+
+        # my_rect1 = Rect(0,0,window_num,window_high)
+        endmark_size = (int(300*2.5),300)
+        stone_w = int(45*5/6)
+        menu_w = 250*2
+        menu_h = 250*1
+
+        images = {}
+        images['game_board'] = img_load(f"{path}\game_board.png", (winow_length, window_high))
+        images['win_black'] = img_load(f"{path}\win_black.png", endmark_size)
+        images['win_white'] = img_load(f"{path}\win_white.png", endmark_size)
+        images['select'] = img_load(f"{path}\select2.png", (stone_w,stone_w))
+        images['last_sign1'] = img_load(f"{path}\last_sign1.png", (stone_w,stone_w))
+        # images[last_sign2] = img_load(f"{path}\last_sign2.png", (stone_w,stone_w))
+        images['black_stone'] = img_load(f"{path}\wblack_stone.png", (stone_w,stone_w))
+        images['white_stone'] = img_load(f"{path}\white_stone.png", (stone_w,stone_w))
+        # images[your_rect1] = Rect(window_length-window_num,0,window_length,window_high)
+        images['play_button'] = img_load(f"{path}\play_button.png", (menu_w+14,menu_h))
+        images['play_button2'] = img_load(f"{path}\play_button2.png", (menu_w,menu_h))
+        images['selected_button'] = img_load(f"{path}\selected_button.png", (menu_w+14,menu_h))
+        images['selected_button2'] = img_load(f"{path}\selected_button2.png", (menu_w,menu_h))
+        images['mute_img'] = img_load(f"{path}\mute.png", (40, 40))
+        self.images = images
+
+
+    def _load_sonuds(self, path='pygame_src\sound'):
         pygame.mixer.music.load(r'pygame_src\bgm\딥마인드챌린지 알파고 경기 시작전 브금1.wav') # 대전 BGM
-        self.selecting_sound = pygame.mixer.Sound("pygame_src\sound\넘기는효과음.wav") # 게임 모드 선택 중
-        self.sound1 = pygame.mixer.Sound("pygame_src\sound\othree.wav") # 게임 시작!
-        self.sound2 = pygame.mixer.Sound("pygame_src\sound\바둑알 놓기.wav")
-        self.sound3 = pygame.mixer.Sound("pygame_src\sound\바둑알 꺼내기.wav")
-        self.sound4 = pygame.mixer.Sound("pygame_src\sound\피싱.wav") # 최후의 수!
-        self.black_foul_sound = pygame.mixer.Sound("pygame_src\sound\디제이스탑.wav") # 거기 두면 안 돼! 금수야! 
-        self.lose_sound = pygame.mixer.Sound("pygame_src\sound\[효과음]BOING.wav") # 응 졌어
-        self.AI_lose = pygame.mixer.Sound('pygame_src\sound\알파고 쉣낏.wav') # AI를 이겼을 때
-        
+
+        sounds = {}
+        sounds['넘기는효과음'] = Sound(f"{path}\넘기는효과음.wav") # 게임 모드 선택 중
+        sounds['othree'] = Sound(f"{path}\othree.wav") # 게임 시작!
+        sounds['바둑알 놓기'] = Sound(f"{path}\바둑알 놓기.wav")
+        sounds['바둑알 꺼내기'] = Sound(f"{path}\바둑알 꺼내기.wav")
+        sounds['피싱'] = Sound(f"{path}\피싱.wav") # 최후의 수!
+        sounds['디제이스탑'] = Sound(f"{path}\디제이스탑.wav") # 거기 두면 안 돼! 금수야! 
+        sounds['BOING'] = Sound(f"{path}\[효과음]BOING.wav") # 응 졌어
+        sounds['AI_lose'] = Sound(f'{path}\알파고 쉣낏.wav') # AI를 이겼을 때
+        self.sounds = sounds
+
+
+    def _load_texts(self):
         # pygame.font.init() # pygame.init()에서 자동으로 실행됨
-        font = r"pygame_src\BMHANNA_11yrs_ttf.ttf"
-        myfont = pygame.font.Font(font, 80)
-        self.threethree_text = myfont.render('응~ 쌍삼~', True, (255, 0, 0)) # True의 의미 : 글자 우둘투둘해지는거 막기 (안티 에일리어싱 여부)
-        self.fourfour_text = myfont.render('응~ 사사~', True, (255, 0, 0))
-        self.six_text = myfont.render('응~ 육목~', True, (255, 0, 0))
-        
-        myfont2 = pygame.font.Font(font, 70)
-        self.foul_lose = myfont2.render('그렇게 두고 싶으면 그냥 둬', True, (255, 0, 0))
-        
-        myfont3 = pygame.font.Font(font, 40)
-        self.AI_vs_AI_mode = myfont3.render('AI vs AI 모드', True, (255, 0, 0))
-        self.AI_is_training_text = myfont3.render('학습 중...', True, (255, 0, 0))
+        HANNA = r"pygame_src\BMHANNA_11yrs_ttf.ttf"
+        fonts = {}
+        fonts[80] = pygame.font.Font(HANNA, 80)
+        fonts[70] = pygame.font.Font(HANNA, 70)
+        fonts[40] = pygame.font.Font(HANNA, 40)
+
+        texts = {}
+        texts['threethree_text'] = fonts[80].render('응~ 쌍삼~', True, (255, 0, 0)) # True의 의미 : 글자 우둘투둘해지는거 막기 (안티 에일리어싱 여부)
+        texts['fourfour_text'] = fonts[80].render('응~ 사사~', True, (255, 0, 0))
+        texts['six_text'] = fonts[80].render('응~ 육목~', True, (255, 0, 0))
+        texts['foul_lose'] = fonts[70].render('그렇게 두고 싶으면 그냥 둬', True, (255, 0, 0))
+        texts['AI_vs_AI_mode'] = fonts[40].render('AI vs AI 모드', True, (255, 0, 0))
+        texts['AI_is_training_text'] = fonts[40].render('학습 중...', True, (255, 0, 0))
+        self.texts = texts
 
 
     def make_board(self, board): # 바둑알 표시하기
         size = self.size
         screen = self.screen
-        black_stone = self.black_stone
-        white_stone = self.white_stone
+        black_stone = self.images.get('black_stone')
+        white_stone = self.images.get('white_stone')
         dis = self.dis
 
         for a in range(size):
@@ -113,41 +121,21 @@ class Omok_Pygame():
     def last_stone(self, xy): # 마지막 돌 위치 표시하기
         dis = self.dis
         dest = (625-18+(xy[0]-7)*dis-250, 375-19+(xy[1]-7)*dis)
-        self.screen.blit(self.last_sign1, dest) ## 18.75 -> 19
+        self.screen.blit(self.images.get('last_sign1'), dest) ## 18.75 -> 19
 
 
     def run(self):
         training_mode = self.training_mode
         mute = self.mute
-
         size = self.size
         screen = self.screen
-        board_img = self.board_img
         window_num = self.window_num
-        play_button = self.play_button
-        selected_button2 = self.selected_button2
-        selecting_sound = self.selecting_sound
-        sound1 = self.sound1
-        selected_button = self.selected_button
-        play_button2 = self.play_button2
-        select = self.select
         dis = self.dis
-        sound2 = self.sound2
-        mute_img = self.mute_img
-        AI_is_training_text = self.AI_is_training_text
-        AI_vs_AI_mode = self.AI_vs_AI_mode
-        win_black = self.win_black
-        win_white = self.win_white
-        black_foul_sound = self.black_foul_sound
-        six_text = self.six_text
-        fourfour_text = self.fourfour_text
-        threethree_text = self.threethree_text
-        foul_lose = self.foul_lose
-        sound4 = self.sound4
-        lose_sound = self.lose_sound
         window_high = self.window_high
-        sound3 = self.sound3
 
+        images = self.images
+        sounds = self.sounds
+        texts = self.texts
 
         print("\n--Python 오목! (렌주룰)--")
         
@@ -193,13 +181,13 @@ class Omok_Pygame():
             board = np.zeros([size, size], dtype=np.float16)
             
             if not training_mode:
-                screen.blit(board_img,(window_num, 0)) # 바둑판 이미지 추가
-                screen.blit(play_button,(125, 100))
-                screen.blit(selected_button2,(125, 400))
+                screen.blit(images.get('game_board'),(window_num, 0)) # 바둑판 이미지 추가
+                screen.blit(images.get('play_button'),(125, 100))
+                screen.blit(images.get('selected_button2'),(125, 400))
                 pygame.display.update()
             elif train_with_Yixin:
                 Yixin.reset()
-                screen.blit(board_img,(window_num, 0)) # 바둑판 이미지 추가
+                screen.blit(images.get('game_board'),(window_num, 0)) # 바둑판 이미지 추가
                 pygame.display.update()
             
             # print("\n게임 모드 선택")
@@ -214,7 +202,7 @@ class Omok_Pygame():
                     elif event.type == pygame.KEYDOWN:
                         
                         if event.key == pygame.K_UP or event.key == pygame.K_DOWN or event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
-                            pygame.mixer.Sound.play(selecting_sound)
+                            Sound.play(sounds.get('넘기는효과음'))
                             if game_mode=="Human_vs_AI":
                                 game_mode = "Human_vs_Human"
                             else:
@@ -223,14 +211,14 @@ class Omok_Pygame():
                         elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
                             # if game_mode = "Human_vs_AI":
                             #     print("준비중")
-                            #     pygame.mixer.Sound.play(black_foul_sound)
+                            #     Sound.play(디제이스탑)
                             #     continue
                             if game_mode=="Human_vs_AI":
                                 pygame.display.set_caption("...인간 주제에? 미쳤습니까 휴먼?")
                                 print('\nAI: "후후... 날 이겨보겠다고?"')
                             else:
                                 pygame.display.set_caption("나랑 같이...오목 할래?")
-                            pygame.mixer.Sound.play(sound1)
+                            Sound.play(sounds.get('othree'))
                             game_selected = True
         
                         elif event.key == pygame.K_t:
@@ -246,14 +234,14 @@ class Omok_Pygame():
         
                         if not game_selected:
                             if game_mode=="Human_vs_AI":
-                                screen.blit(play_button,(125, 100))
-                                screen.blit(selected_button2,(125, 400))
+                                screen.blit(images.get('play_button'),(125, 100))
+                                screen.blit(images.get('selected_button2'),(125, 400))
                             else:
-                                screen.blit(selected_button,(125, 100))
-                                screen.blit(play_button2,(125, 400))
+                                screen.blit(images.get('selected_button'),(125, 100))
+                                screen.blit(images.get('play_button2'),(125, 400))
                         else:
-                            screen.blit(board_img,(window_num, 0))
-                            screen.blit(select,(x_win,y_win))
+                            screen.blit(images.get('game_board'),(window_num, 0))
+                            screen.blit(images.get('select'),(x_win,y_win))
                         pygame.display.update()
         
             if not training_mode or first_trial:
@@ -263,11 +251,10 @@ class Omok_Pygame():
             # print("게임 시작!")
             # print(difference_score_board(whose_turn, size, board), "\n") #print
             while not game_end:
-                screen.blit(board_img,(window_num, 0)) ## screen.fill(0) : 검은 화면
+                screen.blit(images.get('game_board'),(window_num, 0)) ## screen.fill(0) : 검은 화면
                 
                 # 트레이닝 모드일 때
-                if training_mode: # and time.time()-waiting_time > 0.1
-                    # waiting_time = time.time()
+                if training_mode:
         
                     # AI가 두기
                     if not game_over:
@@ -335,7 +322,7 @@ class Omok_Pygame():
                         # 승부가 결정나지 않았으면 턴 교체, 바둑판이 가득 차면 초기화
                         if not game_over:
                             # time.sleep(0.08) ## 바둑돌 소리 겹치지 않게 -> AI계산 시간이 길어지면서 필요없어짐
-                            pygame.mixer.Sound.play(sound2) if not mute else ()
+                            Sound.play(sounds.get('바둑알 놓기')) if not mute else ()
                             whose_turn *= -1
                     
                             if turn < max_turn: 
@@ -348,14 +335,14 @@ class Omok_Pygame():
                     # 바둑알, 커서 위치 표시, 마지막 돌 표시, 학습 모드 화면에 표시
                     if not exit:
                         if mute:
-                            screen.blit(mute_img,(355, 705))
+                            screen.blit(images.get('mute_img'),(355, 705))
                         self.make_board(board)
-                        screen.blit(select,(x_win,y_win))
-                        screen.blit(AI_is_training_text,(10, 705))
+                        screen.blit(images.get('select'),(x_win,y_win))
+                        screen.blit(texts.get('AI_is_training_text'),(10, 705))
                         if turn != 0: # or event.key == pygame.K_F2 or event.key == pygame.K_F3
                             self.last_stone([last_stone_xy[1], last_stone_xy[0]])
                         if game_mode=="AI_vs_AI":
-                            screen.blit(AI_vs_AI_mode,(520, 705))
+                            screen.blit(texts.get('AI_vs_AI_mode'),(520, 705))
                     
                     # 흑,백 승리 이미지 화면에 추가, 학습하기, 기보 저장
                     if game_over:
@@ -364,10 +351,10 @@ class Omok_Pygame():
                         str_turns = str_turns + ("" if str_turns=="" else ",") + str(clean_board_num*225 + turn)
                         
                         if whose_turn == 1 and not black_foul: # 흑 승리/백 승리 표시
-                            screen.blit(win_black,(0,250))
+                            screen.blit(images.get('win_black'),(0,250))
                             if train_with_Yixin: Yixin.Click_setting("plays_w")
                         else:
-                            screen.blit(win_white,(0,250))
+                            screen.blit(images.get('win_white'),(0,250))
                             if train_with_Yixin: Yixin.Click_setting("plays_b")
                         pygame.display.update()
         
@@ -420,7 +407,7 @@ class Omok_Pygame():
                                 # 이미 돌이 놓여 있으면 다시
                                 if board[y][x] == -1 or board[y][x] == 1: 
                                     print("돌이 그 자리에 이미 놓임")
-                                    pygame.mixer.Sound.play(black_foul_sound)
+                                    Sound.play(sounds.get('디제이스탑'))
                                     continue
                                 
                                 # 흑 차례엔 흑돌, 백 차례엔 백돌 두기
@@ -449,42 +436,42 @@ class Omok_Pygame():
                                         print("흑은 장목을 둘 수 없음")
                                         black_foul = True
                                         stubborn_foul = "6목"
-                                        screen.blit(six_text,(235, 660))
+                                        screen.blit(texts.get('six_text'),(235, 660))
                                         if before_foul:
                                             foul_n_mok += 1
                                     elif stubborn_foul=="4-4" or num_Four(whose_turn, board, x, y, placed=True) >= 2:
                                         print("흑은 사사에 둘 수 없음")
                                         black_foul = True
                                         stubborn_foul = "4-4"
-                                        screen.blit(fourfour_text,(235, 660))
+                                        screen.blit(texts.get('fourfour_text'),(235, 660))
                                         if before_foul:
                                             foul_n_mok += 1
                                     elif stubborn_foul=="3-3" or num_Three(whose_turn, board, x, y, placed=True) >= 2:
                                         print("흑은 삼삼에 둘 수 없음")
                                         black_foul = True
                                         stubborn_foul = "3-3"
-                                        screen.blit(threethree_text,(235, 660))
+                                        screen.blit(texts.get('threethree_text'),(235, 660))
                                         if before_foul:
                                                foul_n_mok += 1
                                      
                                     # 금수를 두면 무르고 다시 (연속 금수 10번까지 봐주기)
                                     if black_foul:
                                         if foul_n_mok < 10:
-                                            pygame.mixer.Sound.play(black_foul_sound)
+                                            Sound.play(sounds.get('디제이스탑'))
                                             before_foul = True
                                             black_foul = False
                                             board[y][x] = 0
         
                                             # 바둑알, 커서 위치 표시, 마지막 돌 표시 화면에 추가
                                             self.make_board(board)
-                                            screen.blit(select,(x_win,y_win))
+                                            screen.blit(images.get('select'),(x_win,y_win))
                                             self.last_stone([last_stone_xy[1], last_stone_xy[0]])
                                             pygame.display.update()
                                             continue
                                         else:
                                             print("그렇게 두고 싶으면 그냥 둬\n흑 반칙패!")
-                                            screen.blit(board_img,(window_num, 0))
-                                            screen.blit(foul_lose,(5, 670))
+                                            screen.blit(images.get('game_board'),(window_num, 0))
+                                            screen.blit(texts.get('foul_lose'),(5, 670))
                                             pygame.display.set_caption("이건 몰랐지?ㅋㅋ")
                                             game_over=True
                                 
@@ -499,7 +486,7 @@ class Omok_Pygame():
                                 
                                 # 승부가 결정나지 않았으면 턴 교체, 바둑판이 가득 차면 초기화
                                 if not game_over:
-                                    pygame.mixer.Sound.play(sound2) 
+                                    Sound.play(sounds.get('바둑알 놓기')) 
                                     whose_turn *= -1
         
                                     if turn < max_turn: ### <= -> <
@@ -509,11 +496,11 @@ class Omok_Pygame():
                                         board = np.zeros([size, size])
                                 else:
                                     pygame.mixer.music.stop()
-                                    pygame.mixer.Sound.play(sound4)
+                                    Sound.play(sounds.get('피싱'))
             
                                     if whose_turn == 1 and not black_foul:
                                         # if game_mode=="Human_vs_AI":
-                                            # pygame.mixer.Sound.play(AI_lose)
+                                            # Sound.play(AI_lose)
                                         print("흑 승리!")
                                     else:
                                         if not black_foul:
@@ -548,7 +535,7 @@ class Omok_Pygame():
                                 # 승부가 결정나지 않았으면 턴 교체, 바둑판이 가득 차면 초기화
                                 if not game_over:
                                     # time.sleep(0.08) ## 바둑돌 소리 겹치지 않게 -> AI계산 시간이 길어지면서 필요없어짐
-                                    pygame.mixer.Sound.play(sound2)
+                                    Sound.play(sounds.get('바둑알 놓기'))
                                     whose_turn *= -1
         
                                     if turn < max_turn: 
@@ -558,7 +545,7 @@ class Omok_Pygame():
                                         board = np.zeros([size, size])
                                 else:
                                     pygame.mixer.music.stop()
-                                    pygame.mixer.Sound.play(lose_sound)
+                                    Sound.play(sounds.get('BOING'))
                                     if not black_foul:
                                         print("백 승리!")
                                 # print(difference_score_board(whose_turn, size, board), "\n") #print
@@ -602,7 +589,7 @@ class Omok_Pygame():
                                 stubborn_foul = "No"
                             
                             elif turn > 0:
-                                pygame.mixer.Sound.play(sound3)
+                                Sound.play(sounds.get('바둑알 꺼내기'))
                                 turn -= 1
                                 board[record[turn][0], record[turn][1]] = 0
                                 last_stone_xy = [record[turn-1][0], record[turn-1][1]] # last_stone_xy : 돌의 마지막 위치
@@ -614,27 +601,27 @@ class Omok_Pygame():
                                 stubborn_foul = "No"
                             
                             elif turn < final_turn:
-                                pygame.mixer.Sound.play(sound2)
+                                Sound.play(sounds.get('바둑알 놓기'))
                                 turn += 1
                                 board[record[turn-1][0], record[turn-1][1]] = record[turn-1][2]
                                 last_stone_xy = [record[turn-1][0], record[turn-1][1]]
                         
                         # 기타 키
                         elif event.key == pygame.K_F1: # 바둑돌 지우기
-                            pygame.mixer.Sound.play(sound3)
+                            Sound.play(sounds.get('바둑알 꺼내기'))
                             board[y][x]=0
                         elif event.key == pygame.K_F2: # 검은 바둑돌
                             board[y][x]=1
                             last_stone_xy = [y,x]
-                            pygame.mixer.Sound.play(sound2)
+                            Sound.play(sounds.get('바둑알 놓기'))
                         elif event.key == pygame.K_F3: # 흰 바둑돌
                             board[y][x]=-1
                             last_stone_xy = [y,x]
-                            pygame.mixer.Sound.play(sound2)
+                            Sound.play(sounds.get('바둑알 놓기'))
                         elif event.key == pygame.K_F4: # 커서 현재 위치 출력
                             print("커서 위치:", x, y) # 컴퓨터: 0부터 셈, 사람: 1부터 셈 -> +1 
                         elif event.key == pygame.K_F5: # 바둑판 비우기
-                            pygame.mixer.Sound.play(sound3)
+                            Sound.play(sounds.get('바둑알 꺼내기'))
                             board = np.zeros([size, size])
                         elif event.key == pygame.K_F6: # 현재 턴 출력
                             print(str(turn)+"턴째")
@@ -658,25 +645,25 @@ class Omok_Pygame():
                         # 바둑알, 커서 위치 표시, 마지막 돌 표시, AI vs AI 모드 화면에 추가
                         if not exit:
                             if mute:
-                                screen.blit(mute_img,(355, 705))
+                                screen.blit(images.get('mute_img'),(355, 705))
                             self.make_board(board)
                             if training_mode:
-                                screen.blit(AI_is_training_text,(10, 705))
+                                screen.blit(texts.get('AI_is_training_text'),(10, 705))
                             if not game_review:
-                                screen.blit(select,(x_win,y_win))
+                                screen.blit(images.get('select'),(x_win,y_win))
                             if turn != 0: # or event.key == pygame.K_F2 or event.key == pygame.K_F3
                                 self.last_stone([last_stone_xy[1], last_stone_xy[0]])
                             if game_mode=="AI_vs_AI":
-                                screen.blit(AI_vs_AI_mode,(520, 705))
+                                screen.blit(texts.get('AI_vs_AI_mode'),(520, 705))
         
                         # 흑,백 승리 이미지 화면에 추가, 수순 다시보기 모드로 전환, 기보 저장
                         if game_over and not game_review:
                             game_review = True
                             final_turn = turn
                             if whose_turn == 1 and not black_foul: # 흑 승리/백 승리 표시
-                                screen.blit(win_black,(0,250))
+                                screen.blit(images.get('win_black'),(0,250))
                             else:
-                                screen.blit(win_white,(0,250))
+                                screen.blit(images.get('win_white'),(0,250))
         
                             # 기보 파일로 저장
                             with open('etc/GiBo.txt', 'a', encoding='utf8') as file:
