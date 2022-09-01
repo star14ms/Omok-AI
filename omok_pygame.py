@@ -107,11 +107,9 @@ class Omok_Pygame():
 
 
     def run(self):
-        mute = self.mute
-        size = self.size
+        size = self.size # 수정되지 않을 것들만
         screen = self.screen
         window_num = self.window_num
-        self.dis = self.dis
         window_high = self.window_high
 
         images = self.images
@@ -165,7 +163,7 @@ class Omok_Pygame():
         
             if not self.training_mode or first_trial:
                 first_trial = False
-                pygame.mixer.music.play(-1) if not mute else () # -1 : 반복 재생
+                pygame.mixer.music.play(-1) if not self.mute else () # -1 : 반복 재생
         
             # print("게임 시작!")
             # print(difference_score_board(self.whose_turn, size, self.board), "\n") #print
@@ -231,14 +229,14 @@ class Omok_Pygame():
                                         screen.blit(texts.get('six_text'),(235, 660))
                                         if before_foul:
                                             foul_n_mok += 1
-                                    elif stubborn_foul=="4-4" or num_Four(self.whose_turn, self.board, x, y, placed=True) >= 2:
+                                    elif stubborn_foul=="4-4" or num_Four(self.whose_turn, board_temp, x, y, placed=True) >= 2:
                                         print("흑은 사사에 둘 수 없음")
                                         self.black_foul = True
                                         stubborn_foul = "4-4"
                                         screen.blit(texts.get('fourfour_text'),(235, 660))
                                         if before_foul:
                                             foul_n_mok += 1
-                                    elif stubborn_foul=="3-3" or num_Three(self.whose_turn, self.board, x, y, placed=True) >= 2:
+                                    elif stubborn_foul=="3-3" or num_Three(self.whose_turn, board_temp, x, y, placed=True) >= 2:
                                         print("흑은 삼삼에 둘 수 없음")
                                         self.black_foul = True
                                         stubborn_foul = "3-3"
@@ -286,11 +284,11 @@ class Omok_Pygame():
                             else:
                                 self.training_mode = False
                         elif event.key == pygame.K_m: # 음소거
-                            if not mute:
-                                mute = True
+                            if not self.mute:
+                                self.mute = True
                                 pygame.mixer.music.pause()
                             else:
-                                mute = False
+                                self.mute = False
                                 pygame.mixer.music.unpause()
         
                         # ↑ ↓ → ← 방향키
@@ -459,7 +457,6 @@ class Omok_Pygame():
 
 
     def training_phase(self):
-        mute = self.mute
         size = self.size
         screen = self.screen
         self.dis = self.dis
@@ -527,7 +524,7 @@ class Omok_Pygame():
             # 승부가 결정나지 않았으면 턴 교체, 바둑판이 가득 차면 초기화
             if not self.game_over:
                 # time.sleep(0.08) ## 바둑돌 소리 겹치지 않게 -> AI계산 시간이 길어지면서 필요없어짐
-                Sound.play(sounds.get('바둑알 놓기')) if not mute else ()
+                Sound.play(sounds.get('바둑알 놓기')) if not self.mute else ()
                 self.whose_turn *= -1
         
                 if self.turn < self.max_turn: 
@@ -539,7 +536,7 @@ class Omok_Pygame():
             
         # 바둑알, 커서 위치 표시, 마지막 돌 표시, 학습 모드 화면에 표시
         if not self.exit:
-            if mute:
+            if self.mute:
                 screen.blit(images.get('mute_img'),(355, 705))
             self.screen_bilt_board()
             screen.blit(images.get('select'),(self.x_win,self.y_win))
@@ -589,11 +586,11 @@ class Omok_Pygame():
             if event.type == pygame.KEYDOWN:
 
                 if event.key == pygame.K_m: # 음소거
-                    if not mute:
-                        mute = True
+                    if not self.mute:
+                        self.mute = True
                         pygame.mixer.music.pause()
                     else:
-                        mute = False
+                        self.mute = False
                         pygame.mixer.music.unpause()
 
 
@@ -662,7 +659,7 @@ class Omok_Pygame():
 
         # 바둑알, 커서 위치 표시, 마지막 돌 표시, AI vs AI 모드 화면에 추가
         if not self.exit:
-            if mute:
+            if self.mute:
                 screen.blit(images.get('mute_img'),(355, 705))
             self.screen_bilt_board()
             if self.training_mode:
