@@ -19,18 +19,21 @@ def img_load(filename, size):
 
 
 class Omok_Pygame():
-    def __init__(self, training_mode: bool, mute: bool) -> None:
+    def __init__(self, AI: Omok_AI, training_mode: bool, train_with_Yixin: bool, verbose: bool, mute: bool) -> None:
+        self.AI = AI
         self.training_mode = training_mode
+        self.train_with_Yixin = train_with_Yixin
+        self.verbose = verbose
         self.mute = mute
 
         pygame.init()
         
-        window_length=250*3
-        window_high=250*3
+        window_length = 250*3
+        window_high = 250*3
         self.window_high = window_high
-        self.window_num=0
-        self.size=15 # 바둑판 좌표 범위
-        self.dis=47 # 바둑판 이미지에서 격자 사이의 거리
+        self.window_num = 0
+        self.size = 15 # 바둑판 좌표 범위
+        self.dis = 47 # 바둑판 이미지에서 격자 사이의 거리
 
         self.screen=pygame.display.set_mode((window_length, window_high))
         pygame.display.set_caption("이걸 보다니 정말 대단해!") # 제목
@@ -125,7 +128,6 @@ class Omok_Pygame():
 
 
     def run(self):
-        training_mode = self.training_mode
         mute = self.mute
         size = self.size
         screen = self.screen
@@ -139,13 +141,13 @@ class Omok_Pygame():
 
         print("\n--Python 오목! (렌주룰)--")
         
-        exit=False # 프로그램 종료
+        self.exit = False # 프로그램 종료
         first_trial = True
         
         resent_who_win = []
         str_turns = ""
         
-        while not exit:
+        while not self.exit:
             pygame.display.set_caption("오목이 좋아, 볼록이 좋아? 오목!")
         
             whose_turn = 1 # 누구 턴인지 알려줌 (1: 흑, -1: 백)
@@ -154,11 +156,11 @@ class Omok_Pygame():
             final_turn = None # 승패가 결정난 턴 (수순 다시보기 할 때 활용)
             max_turn = size * size
         
-            game_selected = False # 게임 모드를 선택했나?
-            game_mode = "Human_vs_AI" # 게임 모드
+            self.game_selected = False # 게임 모드를 선택했나?
+            self.game_mode = "Human_vs_AI" # 게임 모드
             AI_mode = "Deep_Learning"
         
-            game_end = False # 게임 후 수순 다시보기 모드까지 끝났나?
+            self.game_end = False # 게임 후 수순 다시보기 모드까지 끝났나?
             game_over = False # 게임이 끝났나?
             game_review = False # 수순 다시보기 모드인가?
         
@@ -175,100 +177,39 @@ class Omok_Pygame():
         
             x=7 # 커서 좌표
             y=7
-            y_win=375-19 ## 18.75 -> 19 # 커서 실제 위치
-            x_win=625-18-250
+            self.y_win=375-19 ## 18.75 -> 19 # 커서 실제 위치
+            self.x_win=625-18-250
         
             board = np.zeros([size, size], dtype=np.float16)
             
-            if not training_mode:
-                screen.blit(images.get('game_board'),(window_num, 0)) # 바둑판 이미지 추가
-                screen.blit(images.get('play_button'),(125, 100))
-                screen.blit(images.get('selected_button2'),(125, 400))
-                pygame.display.update()
-            elif train_with_Yixin:
-                Yixin.reset()
-                screen.blit(images.get('game_board'),(window_num, 0)) # 바둑판 이미지 추가
-                pygame.display.update()
-            
             # print("\n게임 모드 선택")
-            while not game_selected and not training_mode:
-                for event in pygame.event.get():
+            self.select_game_mode(screen, sounds, images)
         
-                    if event.type == pygame.QUIT:
-                        exit=True
-                        game_selected = True
-                        game_end=True
-                    
-                    elif event.type == pygame.KEYDOWN:
-                        
-                        if event.key == pygame.K_UP or event.key == pygame.K_DOWN or event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
-                            Sound.play(sounds.get('넘기는효과음'))
-                            if game_mode=="Human_vs_AI":
-                                game_mode = "Human_vs_Human"
-                            else:
-                                game_mode = "Human_vs_AI"
-        
-                        elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
-                            # if game_mode = "Human_vs_AI":
-                            #     print("준비중")
-                            #     Sound.play(디제이스탑)
-                            #     continue
-                            if game_mode=="Human_vs_AI":
-                                pygame.display.set_caption("...인간 주제에? 미쳤습니까 휴먼?")
-                                print('\nAI: "후후... 날 이겨보겠다고?"')
-                            else:
-                                pygame.display.set_caption("나랑 같이...오목 할래?")
-                            Sound.play(sounds.get('othree'))
-                            game_selected = True
-        
-                        elif event.key == pygame.K_t:
-                            if not training_mode:
-                                training_mode = True
-                            else:
-                                training_mode = False
-        
-                        elif event.key == pygame.K_ESCAPE:
-                            exit=True
-                            game_selected = True
-                            game_end=True
-        
-                        if not game_selected:
-                            if game_mode=="Human_vs_AI":
-                                screen.blit(images.get('play_button'),(125, 100))
-                                screen.blit(images.get('selected_button2'),(125, 400))
-                            else:
-                                screen.blit(images.get('selected_button'),(125, 100))
-                                screen.blit(images.get('play_button2'),(125, 400))
-                        else:
-                            screen.blit(images.get('game_board'),(window_num, 0))
-                            screen.blit(images.get('select'),(x_win,y_win))
-                        pygame.display.update()
-        
-            if not training_mode or first_trial:
+            if not self.training_mode or first_trial:
                 first_trial = False
                 pygame.mixer.music.play(-1) if not mute else () # -1 : 반복 재생
         
             # print("게임 시작!")
             # print(difference_score_board(whose_turn, size, board), "\n") #print
-            while not game_end:
+            while not self.game_end:
                 screen.blit(images.get('game_board'),(window_num, 0)) ## screen.fill(0) : 검은 화면
                 
                 # 트레이닝 모드일 때
-                if training_mode:
+                if self.training_mode:
         
                     # AI가 두기
                     if not game_over:
         
                         if turn == 0:
                             x1, y1 = 7, 7
-                        elif train_with_Yixin and turn >= 3: # 알파오 Yixin (백)
+                        elif self.train_with_Yixin and turn >= 3: # 알파오 Yixin (백)
                             x1, y1 = Yixin.think_win_xy(whose_turn, undo=True if whose_turn == 1 else False)
                             # print(f"{X_line[x1]}{Y_line[y1]} Yixin" if x1!=None else None)
-                        if not train_with_Yixin or x1==None or turn < 3: # 사람이 생각한 알고리즘 (백)
+                        if not self.train_with_Yixin or x1==None or turn < 3: # 사람이 생각한 알고리즘 (백)
                             x1, y1 = AI_think_win_xy(whose_turn, board, all_molds=True, verbose=False)
                             # print(f"{X_line[x1]}{Y_line[y1]} myAI")
-                            if train_with_Yixin and turn == 2: Yixin.Click_setting("plays_w")
-                            if train_with_Yixin and whose_turn==-1:
+                            if self.train_with_Yixin and turn == 2: Yixin.Click_setting("plays_w")
+                            if self.train_with_Yixin and whose_turn==-1:
                                 if turn == 1:
                                     Click(x1, y1, board_xy=True)
                                 else:
@@ -278,14 +219,14 @@ class Omok_Pygame():
                 
                         if whose_turn != 1:
                             x, y = x1, y1
-                            if train_with_Yixin and turn >= 3:
+                            if self.train_with_Yixin and turn >= 3:
                                 Yixin.Click_setting("plays_b")
                                 Yixin.Click_setting("plays_w")
                                 Click(0, 0) # 다음 흑이 둘 수 미리 생각하기 (Yixin)
                         else: # 딥러닝 신경망 AI (흑)
-                            x2, y2 = AI.network.think_win_xy(board, whose_turn, verbose=verbose)
+                            x2, y2 = self.AI.network.think_win_xy(board, whose_turn, verbose=self.verbose)
                             x, y = x2, y2
-                            if train_with_Yixin: Click(x2, y2, board_xy=True)
+                            if self.train_with_Yixin: Click(x2, y2, board_xy=True)
             
                             x_datas = np.append(x_datas, board.reshape(1, 15, 15), axis=0)
                             t_datas = np.append(t_datas, np.array([[y1*15+x1]], dtype=int), axis=0)
@@ -311,8 +252,8 @@ class Omok_Pygame():
                         last_stone_xy = [y, x]
                         turn += 1
                     
-                        x_win = 28 + dis*x # 커서 이동
-                        y_win = 27 + dis*y
+                        self.x_win = 28 + dis*x # 커서 이동
+                        self.y_win = 27 + dis*y
                     
                         # 오목이 생겼으면 게임 종료 신호 키기
                         if isFive(whose_turn, board, x, y, placed=True) == True:
@@ -333,15 +274,15 @@ class Omok_Pygame():
                                 board = np.zeros([size, size])
                         
                     # 바둑알, 커서 위치 표시, 마지막 돌 표시, 학습 모드 화면에 표시
-                    if not exit:
+                    if not self.exit:
                         if mute:
                             screen.blit(images.get('mute_img'),(355, 705))
                         self.make_board(board)
-                        screen.blit(images.get('select'),(x_win,y_win))
+                        screen.blit(images.get('select'),(self.x_win,self.y_win))
                         screen.blit(texts.get('AI_is_training_text'),(10, 705))
                         if turn != 0: # or event.key == pygame.K_F2 or event.key == pygame.K_F3
                             self.last_stone([last_stone_xy[1], last_stone_xy[0]])
-                        if game_mode=="AI_vs_AI":
+                        if self.game_mode=="AI_vs_AI":
                             screen.blit(texts.get('AI_vs_AI_mode'),(520, 705))
                     
                     # 흑,백 승리 이미지 화면에 추가, 학습하기, 기보 저장
@@ -352,16 +293,16 @@ class Omok_Pygame():
                         
                         if whose_turn == 1 and not black_foul: # 흑 승리/백 승리 표시
                             screen.blit(images.get('win_black'),(0,250))
-                            if train_with_Yixin: Yixin.Click_setting("plays_w")
+                            if self.train_with_Yixin: Yixin.Click_setting("plays_w")
                         else:
                             screen.blit(images.get('win_white'),(0,250))
-                            if train_with_Yixin: Yixin.Click_setting("plays_b")
+                            if self.train_with_Yixin: Yixin.Click_setting("plays_b")
                         pygame.display.update()
         
                         # x_datas = np.r_[x_datas_necessary, x_datas]
                         # t_datas = np.r_[t_datas_necessary, t_datas]
         
-                        Omok_AI.train(x_datas, t_datas)
+                        self.AI.train(x_datas, t_datas)
         
                         # 기보 파일로 저장
                         with open('etc/GiBo_Training.txt', 'a', encoding='utf8') as file:
@@ -371,15 +312,15 @@ class Omok_Pygame():
                                 file.write(str(record[i][0]+1)+' '+str(record[i][1]+1)+' '+turn_hangul+'\n')
                             file.write("\n")
                         
-                        game_end = True
+                        self.game_end = True
         
                     # 화면 업데이트
                     pygame.display.update()
         
                     for event in pygame.event.get():
                         if event.type==pygame.QUIT:
-                            exit=True
-                            game_end=True 
+                            self.exit=True
+                            self.game_end=True 
 
                         if event.type == pygame.KEYDOWN:
 
@@ -399,10 +340,10 @@ class Omok_Pygame():
                     if event.type == pygame.KEYDOWN:
         
                         # Enter, Space 키
-                        if event.key == pygame.K_SPACE and not training_mode and not game_over: # 돌 두기
+                        if event.key == pygame.K_SPACE and not self.training_mode and not game_over: # 돌 두기
         
                             # 플레이어가 두기
-                            if game_mode=="Human_vs_Human" or (game_mode=="Human_vs_AI" and whose_turn == -1):
+                            if self.game_mode=="Human_vs_Human" or (self.game_mode=="Human_vs_AI" and whose_turn == -1):
                                 
                                 # 이미 돌이 놓여 있으면 다시
                                 if board[y][x] == -1 or board[y][x] == 1: 
@@ -411,17 +352,14 @@ class Omok_Pygame():
                                     continue
                                 
                                 # 흑 차례엔 흑돌, 백 차례엔 백돌 두기
-                                if whose_turn == 1: 
-                                    board[y][x] = 1
-                                else:
-                                    board[y][x] = -1
+                                board[y][x] = whose_turn
                                 
                                 # 오목 생겼나 확인
                                 five = isFive(whose_turn, board, x, y, placed=True)
                                 
                                 # 오목이 생겼으면 게임 종료 신호 키기, 아니면 무르기
                                 if five == True:
-                                    if game_mode=="Human_vs_AI":
+                                    if self.game_mode=="Human_vs_AI":
                                         pygame.display.set_caption("다시봤습니다 휴먼!")
                                     else:
                                         pygame.display.set_caption("게임 종료!")
@@ -464,7 +402,7 @@ class Omok_Pygame():
         
                                             # 바둑알, 커서 위치 표시, 마지막 돌 표시 화면에 추가
                                             self.make_board(board)
-                                            screen.blit(images.get('select'),(x_win,y_win))
+                                            screen.blit(images.get('select'),(self.x_win,self.y_win))
                                             self.last_stone([last_stone_xy[1], last_stone_xy[0]])
                                             pygame.display.update()
                                             continue
@@ -499,7 +437,7 @@ class Omok_Pygame():
                                     Sound.play(sounds.get('피싱'))
             
                                     if whose_turn == 1 and not black_foul:
-                                        # if game_mode=="Human_vs_AI":
+                                        # if self.game_mode=="Human_vs_AI":
                                             # Sound.play(AI_lose)
                                         print("흑 승리!")
                                     else:
@@ -508,14 +446,14 @@ class Omok_Pygame():
                                 # print(difference_score_board(whose_turn, size, board), "\n") #print
         
                             # AI가 두기
-                            if game_mode=="AI_vs_AI" or (game_mode=="Human_vs_AI" and whose_turn == 1 and not game_over):
+                            if self.game_mode=="AI_vs_AI" or (self.game_mode=="Human_vs_AI" and whose_turn == 1 and not game_over):
                                 
                                 # 사람이 생각한 알고리즘
                                 if AI_mode == "Human_Made_Algorithms":
                                     x, y = AI_think_win_xy(whose_turn, board, all_molds=True, verbose=True)
                                 # 딥러닝 신경망 AI
                                 else:
-                                    x, y = AI.network.think_win_xy(board, whose_turn, verbose=verbose) ### DeepConvNet -> network
+                                    x, y = self.AI.network.think_win_xy(board, whose_turn, verbose=self.verbose) ### DeepConvNet -> network
         
                                 # 선택한 좌표에 돌 두기
                                 board[y][x] = whose_turn
@@ -524,8 +462,8 @@ class Omok_Pygame():
                                 last_stone_xy = [y, x]
                                 turn += 1
         
-                                x_win = 28 + dis*x # 커서 이동
-                                y_win = 27 + dis*y
+                                self.x_win = 28 + dis*x # 커서 이동
+                                self.y_win = 27 + dis*y
         
                                 # 오목이 생겼으면 게임 종료 신호 키기
                                 if isFive(whose_turn, board, x, y, placed=True) == True:
@@ -553,13 +491,13 @@ class Omok_Pygame():
                         elif event.key == pygame.K_SPACE and game_over: # 금수 연타했을 때 패배 창 제대로 못 보고 넘어가기 방지
                             continue
                         elif event.key == pygame.K_RETURN and game_over: # 게임 종료
-                                game_end=True
+                                self.game_end=True
                                 game_over=False
                         elif event.key == pygame.K_t: # 트레이닝 모드 on/off
-                            if not training_mode:
-                                training_mode = True
+                            if not self.training_mode:
+                                self.training_mode = True
                             else:
-                                training_mode = False
+                                self.training_mode = False
                         elif event.key == pygame.K_m: # 음소거
                             if not mute:
                                 mute = True
@@ -571,20 +509,20 @@ class Omok_Pygame():
                         # ↑ ↓ → ← 방향키
                         elif event.key == pygame.K_UP: 
                             if not game_review:
-                                if y_win-dis > 0:
-                                    y_win -= dis
+                                if self.y_win-dis > 0:
+                                    self.y_win -= dis
                                     y -= 1
                             stubborn_foul = "No"
                         elif event.key == pygame.K_DOWN:
                             if not game_review:
-                                if y_win+dis < window_high-dis:
-                                    y_win += dis
+                                if self.y_win+dis < window_high-dis:
+                                    self.y_win += dis
                                     y += 1
                                 stubborn_foul = "No"
                         elif event.key == pygame.K_LEFT:
                             if not game_review:
-                                if x_win-dis > window_num:
-                                    x_win -= dis
+                                if self.x_win-dis > window_num:
+                                    self.x_win -= dis
                                     x -= 1
                                 stubborn_foul = "No"
                             
@@ -595,8 +533,8 @@ class Omok_Pygame():
                                 last_stone_xy = [record[turn-1][0], record[turn-1][1]] # last_stone_xy : 돌의 마지막 위치
                         elif event.key == pygame.K_RIGHT:
                             if not game_review:
-                                if x_win+dis < window_high + window_num - dis:
-                                    x_win += dis
+                                if self.x_win+dis < window_high + window_num - dis:
+                                    self.x_win += dis
                                     x += 1
                                 stubborn_foul = "No"
                             
@@ -628,32 +566,32 @@ class Omok_Pygame():
                         elif event.key == pygame.K_F7: # 기보 출력
                             print(record)
                         elif event.key == pygame.K_F8: # AI vs AI mode on/off
-                            if game_mode != "AI_vs_AI":
-                                game_mode_origin = game_mode
-                                game_mode = "AI_vs_AI"
+                            if self.game_mode != "AI_vs_AI":
+                                game_mode_origin = self.game_mode
+                                self.game_mode = "AI_vs_AI"
                             else:
-                                game_mode = game_mode_origin
+                                self.game_mode = game_mode_origin
                         elif event.key == pygame.K_F9: # AI mode Human_Made_Algorithms / Deep_Learning
                             if AI_mode != "Human_Made_Algorithms":
                                 AI_mode = "Human_Made_Algorithms"
                             else:
                                 AI_mode = "Deep_Learning"
                         elif event.key == pygame.K_ESCAPE: # 창 닫기
-                            exit=True
-                            game_end=True             
+                            self.exit=True
+                            self.game_end=True             
         
                         # 바둑알, 커서 위치 표시, 마지막 돌 표시, AI vs AI 모드 화면에 추가
-                        if not exit:
+                        if not self.exit:
                             if mute:
                                 screen.blit(images.get('mute_img'),(355, 705))
                             self.make_board(board)
-                            if training_mode:
+                            if self.training_mode:
                                 screen.blit(texts.get('AI_is_training_text'),(10, 705))
                             if not game_review:
-                                screen.blit(images.get('select'),(x_win,y_win))
+                                screen.blit(images.get('select'),(self.x_win,self.y_win))
                             if turn != 0: # or event.key == pygame.K_F2 or event.key == pygame.K_F3
                                 self.last_stone([last_stone_xy[1], last_stone_xy[0]])
-                            if game_mode=="AI_vs_AI":
+                            if self.game_mode=="AI_vs_AI":
                                 screen.blit(texts.get('AI_vs_AI_mode'),(520, 705))
         
                         # 흑,백 승리 이미지 화면에 추가, 수순 다시보기 모드로 전환, 기보 저장
@@ -678,21 +616,81 @@ class Omok_Pygame():
         
                     # 창 닫기(X) 버튼을 클릭했을 때
                     elif event.type == pygame.QUIT:
-                        exit=True
-                        game_end=True
+                        self.exit=True
+                        self.game_end=True
           
         print("\nGood Bye")
         pygame.quit()
+
+
+    def select_game_mode(self, screen, sounds, images):
+
+        if not self.training_mode:
+            screen.blit(images.get('game_board'),(self.window_num, 0)) # 바둑판 이미지 추가
+            screen.blit(images.get('play_button'),(125, 100))
+            screen.blit(images.get('selected_button2'),(125, 400))
+            pygame.display.update()
+        elif self.train_with_Yixin:
+            Yixin.reset()
+            screen.blit(images.get('game_board'),(self.window_num, 0)) # 바둑판 이미지 추가
+            pygame.display.update()
+
+
+        while not self.game_selected and not self.training_mode:
+            for event in pygame.event.get():
         
-        plot.loss_graph(AI.graph_datas['train_losses'], smooth=True)
-        plot.loss_graph(AI.graph_datas['train_losses'], smooth=False)
+                if event.type == pygame.QUIT:
+                    self.exit=True
+                    self.game_selected = True
+                    self.game_end=True
+                
+                elif event.type == pygame.KEYDOWN:
+                    
+                    if event.key == pygame.K_UP or event.key == pygame.K_DOWN or event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
+                        Sound.play(sounds.get('넘기는효과음'))
+                        if self.game_mode=="Human_vs_AI":
+                            self.game_mode = "Human_vs_Human"
+                        else:
+                            self.game_mode = "Human_vs_AI"
+        
+                    elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                        if self.game_mode=="Human_vs_AI":
+                            pygame.display.set_caption("...인간 주제에? 미쳤습니까 휴먼?")
+                            print('\nAI: "후후... 날 이겨보겠다고?"')
+                        else:
+                            pygame.display.set_caption("나랑 같이...오목 할래?")
+                        Sound.play(sounds.get('othree'))
+                        self.game_selected = True
+        
+                    elif event.key == pygame.K_t:
+                        if not self.training_mode:
+                            self.training_mode = True
+                        else:
+                            self.training_mode = False
+        
+                    elif event.key == pygame.K_ESCAPE:
+                        self.exit=True
+                        self.game_selected = True
+                        self.game_end=True
+        
+                    if not self.game_selected:
+                        if self.game_mode=="Human_vs_AI":
+                            screen.blit(images.get('play_button'),(125, 100))
+                            screen.blit(images.get('selected_button2'),(125, 400))
+                        else:
+                            screen.blit(images.get('selected_button'),(125, 100))
+                            screen.blit(images.get('play_button2'),(125, 400))
+                    else:
+                        screen.blit(images.get('game_board'),(self.window_num, 0))
+                        screen.blit(images.get('select'),(self.x_win,self.y_win))
+                    pygame.display.update()
 
 
 if __name__ == '__main__':
     saved_network_pkl = "with_Yixin (X26f256) ln_157000 acc_None Adam lr_0.01 CR_CR_CR_CR_A_Smloss params"
     str_data_info = ' '.join(saved_network_pkl.split(' ')[:2])
     
-    training_mode = False
+    training_mode = True
     train_with_Yixin = False
     verbose = False
     mute = False
@@ -700,6 +698,8 @@ if __name__ == '__main__':
     
     if training_mode and train_with_Yixin: Yixin.init()
     
-    omok_pygame = Omok_Pygame(training_mode=training_mode, mute=mute)
+    omok_pygame = Omok_Pygame(AI, training_mode, train_with_Yixin, verbose, mute)
     omok_pygame.run()
-    
+
+    # plot.loss_graph(AI.graph_datas['train_losses'], smooth=True)
+    # plot.loss_graph(AI.graph_datas['train_losses'], smooth=False)
