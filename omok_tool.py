@@ -37,9 +37,9 @@ class Omok_AI:
         graph_datas = {'train_losses': []}
         if saved_graphdata_pkl != "":
             graph_datas = load_graph_datas(saved_graphdata_pkl)
-            if graph_datas != None:
-                plot.loss_graph(graph_datas['train_losses'], smooth=False)
-                plot.loss_graph(graph_datas['train_losses'], smooth=True)
+            # if graph_datas != None:
+            #     plot.loss_graph(graph_datas['train_losses'], smooth=False)
+            #     plot.loss_graph(graph_datas['train_losses'], smooth=True)
         else:
             graph_datas = {'train_losses': []}
 
@@ -66,7 +66,6 @@ class Omok_AI:
         
         x_datas = np.r_[self.x_datas_left, x_datas]
         t_datas = np.r_[self.t_datas_left, t_datas]
-        len_x_datas = len(x_datas)
         
         # 데이터를 100개씩 나누어 학습
         while len(x_datas) >= 100:
@@ -78,11 +77,11 @@ class Omok_AI:
             graph_datas['train_losses'].append(loss)
             network.learning_num += 100
         
-            print(time.str_hms_delta(self.start_time), end=" | ")
-            print(f"{network.learning_num}문제 학습" + \
-                f" | 손실 {format(loss, '.3f')}", end=" | ")
-            print(f"{self.str_turns}수" if len_x_datas == len(x_datas) else "")
-            self.str_turns = ""
+            print('{} | {}문제 학습 | 손실 {}'.format(
+                time.str_hms_delta(self.start_time),
+                network.learning_num,
+                format(loss, '.3f'),
+            ))
         
             x_datas = x_datas[100:]
             t_datas = t_datas[100:]
@@ -108,7 +107,6 @@ class Omok:
     def __init__(self, AI: Omok_AI, train_with_Yixin: bool, verbose: bool = False) -> None:
         self.exit = False # 프로그램 종료
         self.size = 15
-        self.str_turns = ""
     
         self.AI = AI
         self.train_with_Yixin = train_with_Yixin
@@ -203,8 +201,8 @@ class Omok:
             else:
                 self.AI.resent_who_win.append(whose_turn)
                 if len(self.AI.resent_who_win) > 100: del self.AI.resent_who_win[0]
-                
-                self.str_turns = self.str_turns + ("" if self.str_turns=="" else ",") + str(clean_board_num*225 + turn)
+                print(str(clean_board_num*225 + turn) + '수')
+
                 if train_with_Yixin: Yixin.Click_setting("plays_w" if whose_turn == 1 else "plays_b")
                 
                 self.AI.train(x_datas, t_datas)
