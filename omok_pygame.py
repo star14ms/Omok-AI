@@ -19,8 +19,19 @@ def img_load(filename, size):
 
 
 class Omok_Pygame():
-    def __init__(self, AI: Omok_AI, training_mode: bool, train_with_Yixin: bool, verbose: bool, mute: bool) -> None:
+    def __init__(
+        self, 
+        AI: Omok_AI, 
+        AI_color: int = -1, # AI가 어떤 색인지
+        AI_mode: str = "Human_Made_Algorithms", 
+        training_mode: bool = False, 
+        train_with_Yixin: bool = True, 
+        verbose: bool = False, 
+        mute: bool = False,
+    ) -> None:
         self.AI = AI
+        self.AI_color = AI_color 
+        self.AI_mode = AI_mode
         self.training_mode = training_mode
         self.train_with_Yixin = train_with_Yixin
         self.verbose = verbose
@@ -103,6 +114,8 @@ class Omok_Pygame():
         texts['foul_lose'] = fonts[70].render('그렇게 두고 싶으면 그냥 둬', True, (255, 0, 0))
         texts['AI_vs_AI_mode'] = fonts[40].render('AI vs AI 모드', True, (255, 0, 0))
         texts['AI_is_training_text'] = fonts[40].render('학습 중...', True, (255, 0, 0))
+        texts['AI_color_white'] = fonts[40].render('AI: 백 (교체: A)', True, (255, 0, 0))
+        texts['AI_color_black'] = fonts[40].render('AI: 흑 (교체: A)', True, (255, 0, 0))
         self.texts = texts
 
 
@@ -134,7 +147,6 @@ class Omok_Pygame():
         
             self.game_selected = False # 게임 모드를 선택했나?
             self.game_mode = "Human_vs_AI" # 게임 모드
-            AI_mode = "Deep_Learning"
         
             self.game_end = False # 게임 후 수순 다시보기 모드까지 끝났나?
             self.game_over = False # 게임이 끝났나?
@@ -177,10 +189,10 @@ class Omok_Pygame():
 
 
                 # AI가 두기
-                if self.game_mode=="AI_vs_AI" or (self.game_mode=="Human_vs_AI" and self.whose_turn == 1 and not self.game_over):
+                if self.game_mode=="AI_vs_AI" or (self.game_mode=="Human_vs_AI" and self.whose_turn == self.AI_color and not self.game_over):
                     
                     # 알고리즘 AI
-                    if AI_mode == "Human_Made_Algorithms":
+                    if self.AI_mode == "Human_Made_Algorithms":
                         x, y = AI_think_win_xy(self.whose_turn, self.board, all_molds=True, verbose=True)
                     # 딥러닝 신경망 AI
                     else:
@@ -205,7 +217,7 @@ class Omok_Pygame():
                         if event.key == pygame.K_SPACE and not self.training_mode and not self.game_over: # 돌 두기
         
                             # 플레이어가 두기
-                            if self.game_mode=="Human_vs_Human" or (self.game_mode=="Human_vs_AI" and self.whose_turn == -1):
+                            if self.game_mode=="Human_vs_Human" or (self.game_mode=="Human_vs_AI" and self.whose_turn == -self.AI_color):
                                 
                                 # 이미 돌이 놓여 있으면 다시
                                 if self.board[y][x] == -1 or self.board[y][x] == 1: 
@@ -359,10 +371,10 @@ class Omok_Pygame():
                             else:
                                 self.game_mode = game_mode_origin
                         elif event.key == pygame.K_F9: # AI mode Human_Made_Algorithms / Deep_Learning
-                            if AI_mode != "Human_Made_Algorithms":
-                                AI_mode = "Human_Made_Algorithms"
+                            if self.AI_mode != "Human_Made_Algorithms":
+                                self.AI_mode = "Human_Made_Algorithms"
                             else:
-                                AI_mode = "Deep_Learning"
+                                self.AI_mode = "Deep_Learning"
                         elif event.key == pygame.K_ESCAPE: # 창 닫기
                             self.exit=True
                             self.game_end=True             
@@ -396,11 +408,18 @@ class Omok_Pygame():
         screen = self.screen
         sounds = self.sounds
         images = self.images
+        texts = self.texts
 
         if not self.training_mode:
             screen.blit(images.get('game_board'),(self.window_num, 0)) # 바둑판 이미지 추가
             screen.blit(images.get('play_button'),(125, 100))
             screen.blit(images.get('selected_button2'),(125, 400))
+
+            if self.AI_color == 1:
+                screen.blit(texts.get('AI_color_white'),(10, 705))
+            else:
+                screen.blit(texts.get('AI_color_black'),(10, 705))
+                
             pygame.display.update()
         elif self.train_with_Yixin:
             Yixin.reset()
@@ -417,6 +436,7 @@ class Omok_Pygame():
                     self.game_end=True
                 
                 elif event.type == pygame.KEYDOWN:
+                    screen.blit(images.get('game_board'),(self.window_num, 0))
                     
                     if event.key == pygame.K_UP or event.key == pygame.K_DOWN or event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
                         Sound.play(sounds.get('넘기는효과음'))
@@ -439,7 +459,10 @@ class Omok_Pygame():
                             self.training_mode = True
                         else:
                             self.training_mode = False
-        
+
+                    elif event.key == pygame.K_a:
+                        self.AI_color = self.AI_color * -1
+
                     elif event.key == pygame.K_ESCAPE:
                         self.exit=True
                         self.game_selected = True
@@ -447,13 +470,18 @@ class Omok_Pygame():
         
                     if not self.game_selected:
                         if self.game_mode=="Human_vs_AI":
+
+                            if self.AI_color == 1:
+                                screen.blit(texts.get('AI_color_white'),(10, 705))
+                            else:
+                                screen.blit(texts.get('AI_color_black'),(10, 705))
+
                             screen.blit(images.get('play_button'),(125, 100))
                             screen.blit(images.get('selected_button2'),(125, 400))
                         else:
                             screen.blit(images.get('selected_button'),(125, 100))
                             screen.blit(images.get('play_button2'),(125, 400))
                     else:
-                        screen.blit(images.get('game_board'),(self.window_num, 0))
                         screen.blit(images.get('select'),(self.x_win,self.y_win))
                     pygame.display.update()
 
@@ -698,15 +726,18 @@ if __name__ == '__main__':
     saved_network_pkl = None
     str_data_info = 'str_data_info'
     
+    AI_color = -1
+    AI_mode = "Human_Made_Algorithms"
     training_mode = False
     train_with_Yixin = False
     verbose = False
     mute = False
+    
     AI = Omok_AI(saved_network_pkl, str_data_info)
     
     if training_mode and train_with_Yixin: Yixin.init()
     
-    omok_pygame = Omok_Pygame(AI, training_mode, train_with_Yixin, verbose, mute)
+    omok_pygame = Omok_Pygame(AI, AI_color, AI_mode, training_mode, train_with_Yixin, verbose, mute)
     omok_pygame.run()
 
     # plot.loss_graph(AI.graph_datas['train_losses'], smooth=True)
