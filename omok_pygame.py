@@ -22,7 +22,6 @@ class Omok_Pygame():
     def __init__(
         self, 
         AI: Omok_AI, 
-        AI_color: int = -1, # AI가 어떤 색인지
         AI_mode: str = "Human_Made_Algorithms", 
         training_mode: bool = False, 
         train_with_Yixin: bool = True, 
@@ -30,7 +29,7 @@ class Omok_Pygame():
         mute: bool = False,
     ) -> None:
         self.AI = AI
-        self.AI_color = AI_color 
+        self.AI_color: -1 # (1: 흑, -1: 백)
         self.AI_mode = AI_mode
         self.training_mode = training_mode
         self.train_with_Yixin = train_with_Yixin
@@ -416,9 +415,9 @@ class Omok_Pygame():
             screen.blit(images.get('selected_button2'),(125, 400))
 
             if self.AI_color == 1:
-                screen.blit(texts.get('AI_color_white'),(10, 705))
-            else:
                 screen.blit(texts.get('AI_color_black'),(10, 705))
+            else:
+                screen.blit(texts.get('AI_color_white'),(10, 705))
                 
             pygame.display.update()
         elif self.train_with_Yixin:
@@ -472,9 +471,9 @@ class Omok_Pygame():
                         if self.game_mode=="Human_vs_AI":
 
                             if self.AI_color == 1:
-                                screen.blit(texts.get('AI_color_white'),(10, 705))
-                            else:
                                 screen.blit(texts.get('AI_color_black'),(10, 705))
+                            else:
+                                screen.blit(texts.get('AI_color_white'),(10, 705))
 
                             screen.blit(images.get('play_button'),(125, 100))
                             screen.blit(images.get('selected_button2'),(125, 400))
@@ -726,7 +725,6 @@ if __name__ == '__main__':
     saved_network_pkl = None
     str_data_info = 'str_data_info'
     
-    AI_color = -1
     AI_mode = "Human_Made_Algorithms"
     training_mode = False
     train_with_Yixin = False
@@ -737,7 +735,7 @@ if __name__ == '__main__':
     
     if training_mode and train_with_Yixin: Yixin.init()
     
-    omok_pygame = Omok_Pygame(AI, AI_color, AI_mode, training_mode, train_with_Yixin, verbose, mute)
+    omok_pygame = Omok_Pygame(AI, AI_mode, training_mode, train_with_Yixin, verbose, mute)
     omok_pygame.run()
 
     # plot.loss_graph(AI.graph_datas['train_losses'], smooth=True)
