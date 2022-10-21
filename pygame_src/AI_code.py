@@ -2,6 +2,7 @@ import numpy as np
 import random # 점수가 같은 좌표들 중 하나 고르기
 from pygame_src.foul_detection import isFive, num_Four, num_Three, isFoul
 from modules.common.util import bcolors
+from modules.test import print_board
 
 def AI_think_win_xy(whose_turn, board, all_molds, mok_value=1.2, verbose=False, return_is_necessary=False):
     board = board.copy()
@@ -166,14 +167,17 @@ def AI_think_win_xy(whose_turn, board, all_molds, mok_value=1.2, verbose=False, 
 
     # 연결 기대 점수판, 기대점수 1위, 최종 우선순위 1위 좌표 출력
     if verbose:
-        np.set_printoptions(linewidth=np.inf, formatter={'all':lambda _x: ( # 세자리 출력(100) 방지
-            bcolors.according_to_score(_x) + str(int(np.minimum(_x, 99))).rjust(2) + bcolors.ENDC)})
+        # formatter = {'all':lambda _x: ( # 세자리 출력(100) 방지
+            # bcolors.according_to_score(_x) + str(int(np.minimum(_x, 99))).rjust(2) + bcolors.ENDC)}
+        formatter = {'all':lambda _x: str(int(np.minimum(_x, 99))).rjust(2)}
+        np.set_printoptions(linewidth=np.inf, formatter=formatter)
         scores_nomalized = ( (scores - np.min(scores)) / (scores.ptp() + 1e-7) * 100)
         # print(scores[5, 6], scores[5, 8], scores[8, 6], scores[8, 8])
         print("\n"+"="*40+"\n")
         str_self_opon = "흑/백" if whose_turn==1 else "백/흑"
         print(f"4목 {str_self_opon} {self_5_xy}/{opon_5_xy}, 3목 {str_self_opon} {self_4_xys}/{opon_4_xys}")
         print(scores_nomalized, "\n")
+        # print_board(board, scores_nomalized, mode="QnAI")
     
         if all_molds and len(np.where(board != 0)[0]) == 2:
             if whose_turn*-1 in (board[7, 6], board[7, 8], board[6, 7], board[8, 7]):

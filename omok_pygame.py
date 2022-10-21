@@ -29,7 +29,7 @@ class Omok_Pygame():
         mute: bool = False,
     ) -> None:
         self.AI = AI
-        self.AI_color: -1 # (1: 흑, -1: 백)
+        self.AI_color = -1 # (1: 흑, -1: 백)
         self.AI_mode = AI_mode
         self.training_mode = training_mode
         self.train_with_Yixin = train_with_Yixin
@@ -154,8 +154,8 @@ class Omok_Pygame():
             self.record = [] # 기보 기록할 곳
             self.x_datas = np.empty((0, 15, 15), dtype=np.float16)
             self.t_datas = np.empty((0, 1), dtype=int)
-            x_datas_necessary = np.empty((0, 15, 15), dtype=np.float16)
-            t_datas_necessary = np.empty((0, 1), dtype=int)
+            # self.x_datas_necessary = np.empty((0, 15, 15), dtype=np.float16)
+            # self.t_datas_necessary = np.empty((0, 1), dtype=int)
         
             self.black_foul = False # 금수를 뒀나?
             before_foul = False # 한 수 전에 금수를 뒀나?
@@ -437,14 +437,14 @@ class Omok_Pygame():
                 elif event.type == pygame.KEYDOWN:
                     screen.blit(images.get('game_board'),(self.window_num, 0))
                     
-                    if event.key == pygame.K_UP or event.key == pygame.K_DOWN or event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
+                    if event.key in [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT]:
                         Sound.play(sounds.get('넘기는효과음'))
                         if self.game_mode=="Human_vs_AI":
                             self.game_mode = "Human_vs_Human"
                         else:
                             self.game_mode = "Human_vs_AI"
         
-                    elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                    elif event.key in [pygame.K_RETURN, pygame.K_SPACE]:
                         if self.game_mode=="Human_vs_AI":
                             pygame.display.set_caption("...인간 주제에? 미쳤습니까 휴먼?")
                             print('\nAI: "후후... 날 이겨보겠다고?"')
@@ -533,8 +533,8 @@ class Omok_Pygame():
             
             # # 둘 곳이 명백할 때, 마지막 4수의 보드 상태와 내 AI답 저장 (학습할 문제와 답 저장)
             # if is_necessary:
-                # x_datas_necessary = np.append(x_datas_necessary, self.board.reshape(1, 15, 15), axis=0)
-                # t_datas_necessary = np.append(t_datas_necessary, np.array([[y1*15+x1]], dtype=int), axis=0)
+                # self.x_datas_necessary = np.append(self.x_datas_necessary, self.board.reshape(1, 15, 15), axis=0)
+                # self.t_datas_necessary = np.append(self.t_datas_necessary, np.array([[y1*15+x1]], dtype=int), axis=0)
             # elif self.whose_turn == 1:
                 # self.x_datas = np.append(self.x_datas, self.board.reshape(1, 15, 15), axis=0)
                 # self.t_datas = np.append(self.t_datas, np.array([[y1*15+x1]], dtype=int), axis=0)
@@ -589,8 +589,8 @@ class Omok_Pygame():
                 if self.train_with_Yixin: Yixin.Click_setting("plays_b")
             pygame.display.update()
         
-            # self.x_datas = np.r_[x_datas_necessary, self.x_datas]
-            # self.t_datas = np.r_[t_datas_necessary, self.t_datas]
+            # self.x_datas = np.r_[self.x_datas_necessary, self.x_datas]
+            # self.t_datas = np.r_[self.t_datas_necessary, self.t_datas]
 
             self.AI.train(self.x_datas, self.t_datas)
         

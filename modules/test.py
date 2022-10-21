@@ -69,7 +69,7 @@ def print_board(*args, mode="QnAI", num_answers=1):
             T = T.reshape(15, 15)
         t_y, t_x = T.argmax()//15, T.argmax()%15
     
-    if "AI" in mode and A.sum().round() != 100:
+    if "AI" in mode and 99 <= A.sum().round() <= 101:
         A = A*100 # 백분율
     
     len_x, len_y = Q.shape[-1], Q.shape[-2]
